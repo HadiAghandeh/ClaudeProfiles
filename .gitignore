@@ -1,0 +1,9 @@
+# Local profile list (contains account emails and local paths)
+profiles.json
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
