@@ -22,6 +22,16 @@ func TestSafeFolderName(t *testing.T) {
 	}
 }
 
+func TestMakeShortcutsRejectsBadPlace(t *testing.T) {
+	a := &app{}
+	if err := a.makeShortcuts(&Record{Label: "x"}, "attic", false, ""); err == nil {
+		t.Fatal("want an error for an unknown place")
+	}
+	if err := run(options{shortcut: "desktop"}); err == nil {
+		t.Fatal("want an error for -shortcut without -profile")
+	}
+}
+
 func TestPSQuote(t *testing.T) {
 	if got := psQuote(`C:\it's here`); got != `'C:\it''s here'` {
 		t.Errorf("psQuote = %s", got)

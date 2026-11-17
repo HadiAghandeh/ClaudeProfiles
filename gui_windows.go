@@ -80,6 +80,7 @@ func runGUI(recordsFile string) error {
 		"startCode":     g.startCode,
 		"startMain":     g.startMain,
 		"removeProfile": g.remove,
+		"makeShortcuts": g.makeShortcuts,
 		"browseFolder":  g.browseFolder,
 		"openFolder":    g.openFolder,
 	} {
@@ -143,6 +144,36 @@ func (g *gui) remove(label string) (guiState, error) {
 		return g.state(), err
 	}
 	return g.state(), g.a.deleteProfile(r)
+}
+
+// makeShortcuts creates the chosen shortcuts and returns their paths.
+func (g *gui) makeShortcuts(label string, code bool, dir string, desktop, start bool) ([]string, error) {
+	r, err := g.record(label)
+	if err != nil {
+		return nil, err
+	}
+	var places []string
+	if desktop {
+		places = append(places, placeDesktop)
+	}
+	if start {
+		places = append(places, placeStart)
+	}
+	if len(places) == 0 {
+		return nil, errors.New("choose Desktop, Start menu, or both")
+	}
+	var made []string
+	for _, p := range places {
+		path, err := g.a.createShortcut(r, p, code, dir)
+		if err != nil {
+			return made, err
+		}
+		made = append(made, path)
+	}
+	if code && strings.TrimSpace(dir) != "" {
+		g.lastDir = strings.Trim(strings.TrimSpace(dir), `"`)
+	}
+	return made, nil
 }
 
 func (g *gui) openFolder(path string) error {

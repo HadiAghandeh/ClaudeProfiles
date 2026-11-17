@@ -15,6 +15,7 @@
 //	claude-profiles -profile a@second.com            start that user's Claude Desktop
 //	claude-profiles -profile a@second.com -code      start that user's Claude Code in the current folder
 //	claude-profiles -profile a@second.com -code -dir C:\src\app
+//	claude-profiles -profile a@second.com -shortcut both    Desktop + Start menu shortcuts (add -code for Claude Code)
 //	claude-profiles -list                            list the profiles and exit
 package main
 
@@ -71,6 +72,7 @@ func main() {
 	dir := flag.String("dir", "", "with -code: project folder to open (default: current folder)")
 	list := flag.Bool("list", false, "list the profiles and exit")
 	records := flag.String("profiles-file", "", "path to profiles.json (default: next to the executable)")
+	shortcut := flag.String("shortcut", "", "with -profile: create a shortcut instead of starting it: desktop, start or both")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -80,7 +82,7 @@ func main() {
 	}
 
 	interactive := *profile == "" && !*list
-	if guiBuild && interactive {
+	if guiBuild && interactive && *shortcut == "" {
 		// claude-profiles-gui.exe without arguments opens the window.
 		if err := runGUI(*records); err != nil {
 			showError(err.Error())
@@ -88,7 +90,8 @@ func main() {
 		}
 		return
 	}
-	if err := run(*profile, *code, *dir, *list, *records); err != nil {
+	opts := options{profile: *profile, code: *code, dir: *dir, list: *list, recordsFile: *records, shortcut: *shortcut}
+	if err := run(opts); err != nil {
 		if guiBuild { // no console to print to
 			showError(err.Error())
 			os.Exit(1)
@@ -119,22 +122,35 @@ func openApp(recordsFile string) (*app, error) {
 	return a, nil
 }
 
-func run(profile string, code bool, dir string, list bool, recordsFile string) error {
-	a, err := openApp(recordsFile)
+// options are the command-line flags.
+type options struct {
+	profile, dir, recordsFile, shortcut string
+	code, list                          bool
+}
+
+func run(o options) error {
+	if o.shortcut != "" && o.profile == "" {
+		return errors.New("-shortcut needs -profile")
+	}
+	a, err := openApp(o.recordsFile)
 	if err != nil {
 		return err
 	}
 
 	switch {
-	case list:
+	case o.list:
 		a.printList()
 		return nil
-	case profile != "":
-		r := a.find(profile)
+	case o.profile != "":
+		r := a.find(o.profile)
 		if r == nil {
-			return fmt.Errorf("no user named %q; run without arguments to see the list or add it", profile)
+			return fmt.Errorf("no user named %q; run without arguments to see the list or add it", o.profile)
 		}
-		if code {
+		if o.shortcut != "" {
+			return a.makeShortcuts(r, o.shortcut, o.code, o.dir)
+		}
+		if o.code {
+			dir := o.dir
 			if dir == "" {
 				if dir, err = os.Getwd(); err != nil {
 					return err
@@ -146,6 +162,29 @@ func run(profile string, code bool, dir string, list bool, recordsFile string) e
 	default:
 		return a.menu()
 	}
+}
+
+// makeShortcuts handles -shortcut desktop|start|both.
+func (a *app) makeShortcuts(r *Record, where string, code bool, dir string) error {
+	var places []string
+	switch strings.ToLower(where) {
+	case placeDesktop:
+		places = []string{placeDesktop}
+	case placeStart, "startmenu", "start-menu":
+		places = []string{placeStart}
+	case "both":
+		places = []string{placeDesktop, placeStart}
+	default:
+		return fmt.Errorf("-shortcut must be desktop, start or both, not %q", where)
+	}
+	for _, p := range places {
+		path, err := a.createShortcut(r, p, code, dir)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Created", path)
+	}
+	return nil
 }
 
 func newApp(recordsFile string) (*app, error) {
@@ -426,6 +465,11 @@ func (a *app) menu() error {
 				return err
 			}
 			a.prompt("Press Enter to continue")
+		case strings.EqualFold(choice, "s"):
+			if err := a.shortcutPrompt(); err != nil {
+				fmt.Println("Error:", err)
+			}
+			a.prompt("Press Enter to continue")
 		case codeChoice.MatchString(choice):
 			n, _ := strconv.Atoi(codeChoice.FindStringSubmatch(choice)[1])
 			launched, err := a.pickCode(n - 1)
@@ -465,6 +509,7 @@ func (a *app) showMenu() {
 	fmt.Println("   M)  Main Claude Desktop (your normal profile)")
 	fmt.Println("   A)  Add a new user")
 	fmt.Println("   R)  Remove a user")
+	fmt.Println("   S)  Create a Desktop / Start menu shortcut")
 	fmt.Println("   Q)  Quit")
 	fmt.Println()
 }
@@ -511,8 +556,10 @@ func (a *app) createProfile(label string) (*Record, error) {
 	return r, a.save()
 }
 
-// deleteProfile removes a user's Desktop and Code data folders and its record.
+// deleteProfile removes a user's Desktop and Code data folders, its shortcuts
+// and its record.
 func (a *app) deleteProfile(r *Record) error {
+	removeShortcuts(r.Label)
 	for _, d := range []string{r.Folder, a.codeFolder(r)} {
 		if err := os.RemoveAll(d); err != nil {
 			return err
@@ -552,6 +599,31 @@ func (a *app) addProfile() (bool, error) {
 	return false, nil
 }
 
+func (a *app) shortcutPrompt() error {
+	n, err := strconv.Atoi(a.prompt("Number of the user (blank to cancel): "))
+	if err != nil {
+		return nil
+	}
+	if n < 1 || n > len(a.records) {
+		fmt.Println("No such number.")
+		return nil
+	}
+	r := a.records[n-1]
+	code := strings.HasPrefix(strings.ToLower(a.prompt("Shortcut for [D]esktop app or Claude [C]ode? (default D): ")), "c")
+	dir := ""
+	if code {
+		dir = strings.Trim(a.prompt("Project folder (blank = your home folder): "), `"`)
+	}
+	where := "both"
+	switch strings.ToLower(a.prompt("Put it on the [D]esktop, in the [S]tart menu, or [B]oth? (default B): ")) {
+	case "d":
+		where = placeDesktop
+	case "s":
+		where = placeStart
+	}
+	return a.makeShortcuts(r, where, code, dir)
+}
+
 func (a *app) removeProfile() error {
 	pick := a.prompt("Number of the user to remove (blank to cancel): ")
 	n, err := strconv.Atoi(pick)
@@ -567,6 +639,7 @@ func (a *app) removeProfile() error {
 	fmt.Printf("This removes %s and deletes its data folders:\n", r.Label)
 	fmt.Printf("  %s   (Claude Desktop)\n", r.Folder)
 	fmt.Printf("  %s   (Claude Code)\n", codeDir)
+	fmt.Println("Its Desktop and Start menu shortcuts are removed too.")
 	fmt.Println("That signs the user out on this PC and cannot be undone. Conversations stay on the Claude account.")
 	if a.prompt("Type DELETE to confirm, anything else to cancel: ") != "DELETE" {
 		fmt.Println("Cancelled.")
