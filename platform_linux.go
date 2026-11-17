@@ -45,9 +45,9 @@ func defaultRecordsFile() (string, error) {
 	return filepath.Join(dir, "claude-profiles", "profiles.json"), nil
 }
 
-// findClaudeDesktop looks for an unofficial Linux build of Claude Desktop:
-// Anthropic does not publish one, but community builds install a
-// "claude-desktop" command.
+// findClaudeDesktop looks for the "claude-desktop" command, which Anthropic's
+// Linux beta package (Debian/Ubuntu, https://code.claude.com/docs/en/desktop-linux)
+// installs. Community builds use the same command name.
 func findClaudeDesktop() (string, error) {
 	if p, err := exec.LookPath("claude-desktop"); err == nil {
 		return p, nil
@@ -57,7 +57,7 @@ func findClaudeDesktop() (string, error) {
 			return c, nil
 		}
 	}
-	return "", errors.New("Claude Desktop is not available for Linux, so only Claude Code profiles work here. (If you use an unofficial build, put its claude-desktop command on your PATH.)")
+	return "", errors.New("Claude Desktop was not found. On Ubuntu 22.04+ or Debian 12+, install the Linux beta (sudo apt install claude-desktop, see https://code.claude.com/docs/en/desktop-linux); Claude Code profiles work without it")
 }
 
 func desktopAvailable() bool {

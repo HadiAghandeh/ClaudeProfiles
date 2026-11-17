@@ -45,18 +45,18 @@ Claude Desktop and Claude Code sign in to one account at a time. If you have a p
 | --- | :---: | :---: | :---: |
 | Terminal app (`claude-profiles`) | ✅ x64, ARM64 | ✅ Intel, Apple Silicon | ✅ x64, ARM64 |
 | Window app (`claude-profiles-gui`) | ✅ x64, ARM64 | — use the terminal app | ✅ x64 |
-| Claude Desktop profiles | ✅ | ✅ | only with an unofficial build¹ |
+| Claude Desktop profiles | ✅ | ✅ | ✅ with the Linux beta¹ |
 | Claude Code profiles | ✅ | ✅ | ✅ |
 | Desktop and menu shortcuts | ✅ Start menu | ✅ Applications folder | ✅ app menu |
 | "Open" status for Claude Desktop | ✅ | ✅ | ✅¹ |
 
-¹ Anthropic doesn't publish Claude Desktop for Linux. If you use a community build that installs a `claude-desktop` command, Claude Profiles picks it up; otherwise the Linux app manages Claude Code profiles only.
+¹ Claude Desktop for Linux is in [beta](https://code.claude.com/docs/en/desktop-linux) for Ubuntu 22.04+ and Debian 12+ (x64 and arm64, `sudo apt install claude-desktop`). Claude Profiles finds its `claude-desktop` command automatically and shows the Claude Desktop buttons; without it, the Linux app manages Claude Code profiles only. Running several accounts through the beta hasn't been verified yet.
 
 > macOS support is new: it's built and checked by CI on every change, but hasn't been tried on a real Mac yet. Reports are welcome in [Issues](https://github.com/HadiAghandeh/ClaudeMultiUser/issues).
 
 <p align="center">
   <img src="docs/screenshot-linux.png" width="640" alt="Claude Profiles window on Linux (GTK) listing Claude accounts with Claude Code buttons, shortcut and remove icons; work@company.com is marked Open">
-  <br><sub>The window app on Linux. Without Claude Desktop installed it shows Claude Code only.</sub>
+  <br><sub>The window app on Linux. Without the Claude Desktop beta installed it shows Claude Code only.</sub>
 </p>
 
 ## Features
@@ -287,7 +287,7 @@ git push origin v1.1.0
 ## FAQ
 
 **Can I run two Claude Desktop accounts at the same time?**
-Yes, on Windows and macOS. Each profile runs as its own Claude Desktop instance with its own window.
+Yes. Each profile runs as its own Claude Desktop instance with its own window. On Linux this uses the Claude Desktop beta and hasn't been verified yet.
 
 **Can I use multiple Claude Code accounts at the same time?**
 Yes, on all three systems. Each Claude Code profile has its own `CLAUDE_CONFIG_DIR`, so two accounts can work in parallel.
@@ -306,7 +306,7 @@ The terminal app covers macOS fully, including shortcuts that open Claude Deskto
 
 ## Troubleshooting
 
-- **"Claude Desktop was not found"** — install Claude Desktop from [claude.ai/download](https://claude.ai/download). On Linux there's no official build; use Claude Code profiles.
+- **"Claude Desktop was not found"** — install Claude Desktop from [claude.ai/download](https://claude.ai/download). On Ubuntu/Debian, install the [Linux beta](https://code.claude.com/docs/en/desktop-linux) (`sudo apt install claude-desktop` after adding Anthropic's apt repository).
 - **"Claude Code was not found"** — install Claude Code and make sure `claude` is on your `PATH`.
 - **Claude Code asks me to log in again** — expected the first time for each profile; run `/login` once per profile.
 - **Linux: "no terminal app was found"** — install a terminal such as GNOME Terminal or xterm, or set the `TERMINAL` environment variable.
