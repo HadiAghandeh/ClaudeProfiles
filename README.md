@@ -46,7 +46,7 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 
 1. Download or clone this repository:
    ```bash
-   git clone <your-repo-url> claude-multi-user
+   git clone https://github.com/HadiAghandeh/ClaudeMultiUser.git
    ```
 2. That's it — no build step. Keep the files together in one folder.
 
