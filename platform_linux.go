@@ -70,6 +70,12 @@ func desktopCommand(folder string) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Claude Desktop (Chromium) refuses to run as root unless its sandbox is
+	// turned off, which Anthropic doesn't support. Say so instead of failing
+	// silently; WSL in particular often logs in as root.
+	if os.Geteuid() == 0 {
+		return nil, errors.New("Claude Desktop can't run as root. Use a regular user account (on WSL, create one with \"adduser\" and set it as the default user); Claude Code profiles work as root")
+	}
 	if folder == "" {
 		return exec.Command(claude), nil
 	}

@@ -50,7 +50,7 @@ Claude Desktop and Claude Code sign in to one account at a time. If you have a p
 | Desktop and menu shortcuts | ✅ Start menu | ✅ Applications folder | ✅ app menu |
 | "Open" status for Claude Desktop | ✅ | ✅ | ✅¹ |
 
-¹ Claude Desktop for Linux is in [beta](https://code.claude.com/docs/en/desktop-linux) for Ubuntu 22.04+ and Debian 12+ (x64 and arm64, `sudo apt install claude-desktop`). Claude Profiles finds its `claude-desktop` command automatically and shows the Claude Desktop buttons; without it, the Linux app manages Claude Code profiles only. Running several accounts through the beta hasn't been verified yet.
+¹ Claude Desktop for Linux is in [beta](https://code.claude.com/docs/en/desktop-linux) for Ubuntu 22.04+ and Debian 12+ (x64 and arm64, `sudo apt install claude-desktop`). Claude Profiles finds its `claude-desktop` command automatically and shows the Claude Desktop buttons; without it, the Linux app manages Claude Code profiles only. Tested with beta 5.11492: each profile runs as its own instance with its own data folder, and the **Open** status works. Like the beta itself, it needs a regular (non-root) user.
 
 > macOS support is new: it's built and checked by CI on every change, but hasn't been tried on a real Mac yet. Reports are welcome in [Issues](https://github.com/HadiAghandeh/ClaudeMultiUser/issues).
 
@@ -287,7 +287,7 @@ git push origin v1.1.0
 ## FAQ
 
 **Can I run two Claude Desktop accounts at the same time?**
-Yes. Each profile runs as its own Claude Desktop instance with its own window. On Linux this uses the Claude Desktop beta and hasn't been verified yet.
+Yes. Each profile runs as its own Claude Desktop instance with its own window and data folder — on Linux too, with the Claude Desktop beta.
 
 **Can I use multiple Claude Code accounts at the same time?**
 Yes, on all three systems. Each Claude Code profile has its own `CLAUDE_CONFIG_DIR`, so two accounts can work in parallel.
@@ -309,6 +309,7 @@ The terminal app covers macOS fully, including shortcuts that open Claude Deskto
 - **"Claude Desktop was not found"** — install Claude Desktop from [claude.ai/download](https://claude.ai/download). On Ubuntu/Debian, install the [Linux beta](https://code.claude.com/docs/en/desktop-linux) (`sudo apt install claude-desktop` after adding Anthropic's apt repository).
 - **"Claude Code was not found"** — install Claude Code and make sure `claude` is on your `PATH`.
 - **Claude Code asks me to log in again** — expected the first time for each profile; run `/login` once per profile.
+- **Linux: "Claude Desktop can't run as root"** — Claude Desktop doesn't support running as root. Use a regular user; on WSL, which often logs in as root, create one with `adduser` and make it the default user. Claude Code profiles work either way.
 - **Linux: "no terminal app was found"** — install a terminal such as GNOME Terminal or xterm, or set the `TERMINAL` environment variable.
 - **Linux: the window doesn't open** — install WebKitGTK (`libwebkit2gtk-4.1-0`), or use `claude-profiles` in a terminal.
 - **macOS: "cannot be opened because the developer cannot be verified"** — run `xattr -d com.apple.quarantine` on the binary once (see [Installation](#macos)).
