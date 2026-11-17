@@ -11,7 +11,7 @@
   <img src="docs/screenshot.png" width="760" alt="Claude Profiles window on Windows listing four Claude accounts, each with buttons to open Claude Desktop or Claude Code as that account">
 </p>
 
-> Keywords: Claude Desktop multiple accounts, Claude Code multiple accounts, Claude Code switch account, `CLAUDE_CONFIG_DIR`, Claude multi-user, Claude profile manager, switch Claude accounts, run two Claude Desktop instances, Anthropic Claude Windows, `--user-data-dir`, PowerShell launcher, Go CLI.
+> Keywords: Claude Desktop multiple accounts, Claude Code multiple accounts, Claude Code switch account, `CLAUDE_CONFIG_DIR`, Claude multi-user, Claude profile manager, switch Claude accounts, run two Claude Desktop instances, Anthropic Claude Windows, `--user-data-dir`, Claude shortcut per account, Claude Start menu shortcut, PowerShell launcher, Go CLI.
 
 ---
 
@@ -40,10 +40,10 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 
 - 🧑‍🤝‍🧑 **Multiple Claude accounts at once** — each profile opens in its own window.
 - 🖼️ **Desktop app with a real window** — `claude-profiles-gui.exe` lists your profiles with one-click **Claude Desktop** and **Claude Code** buttons, a folder picker, and light/dark mode.
+- 🚀 **Desktop and Start menu shortcuts per account** — one click creates a shortcut like `Claude - work@company.com` or `Claude Code - work@company.com`, so each account opens straight from the Desktop, the Start menu or Windows search, and can be pinned to the taskbar. Removing a profile removes its shortcuts. [See how ↓](#desktop-shortcuts-per-account)
 - 💻 **Claude Code profile switcher** — start the `claude` CLI as any profile in a new terminal (Windows Terminal when available).
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
-- 📋 **Simple interactive menu** — pick a user by number, add (`A`), remove (`R`), or open your main profile (`M`).
-- ⚡ **One-click shortcuts** — create Desktop and Start menu shortcuts for any account, for Claude Desktop or Claude Code.
+- 📋 **Simple interactive menu** — pick a user by number, add (`A`), remove (`R`), create shortcuts (`S`), or open your main profile (`M`).
 - 🔍 **Auto-discovery** — existing profile folders on disk are picked up automatically.
 - 🕒 **Last-used tracking** — the menu shows when each profile was last opened.
 - 🪶 **No install, no dependencies** — download one `.exe`, or use the PowerShell script that ships with Windows.
