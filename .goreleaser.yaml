@@ -64,6 +64,9 @@ archives:
       - goos: windows
         formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Windows and Linux x64 archives also hold the window app; macOS and
+    # Linux arm64 have the terminal app only.
+    allow_different_binary_count: true
     files:
       - README.md
 
