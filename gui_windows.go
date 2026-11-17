@@ -28,12 +28,13 @@ var iconICO []byte
 const createNoWindow = 0x08000000
 
 type guiProfile struct {
-	Label      string `json:"label"`
-	Folder     string `json:"folder"`
-	CodeFolder string `json:"codeFolder"`
-	Created    string `json:"created"`
-	LastUsed   string `json:"lastUsed"`
-	Running    bool   `json:"running"` // Claude Desktop is open for this profile
+	Label      string   `json:"label"`
+	Folder     string   `json:"folder"`
+	CodeFolder string   `json:"codeFolder"`
+	Created    string   `json:"created"`
+	LastUsed   string   `json:"lastUsed"`
+	Running    bool     `json:"running"`    // Claude Desktop is open for this profile
+	RecentDirs []string `json:"recentDirs"` // recent Claude Code folders that still exist
 }
 
 type guiState struct {
@@ -83,6 +84,7 @@ func runGUI(recordsFile string) error {
 		"removeProfile": g.remove,
 		"makeShortcuts": g.makeShortcuts,
 		"renameProfile": g.rename,
+		"forgetRecent":  g.forgetRecent,
 		"browseFolder":  g.browseFolder,
 		"openFolder":    g.openFolder,
 	} {
@@ -98,7 +100,7 @@ func runGUI(recordsFile string) error {
 func (g *gui) state() guiState {
 	s := guiState{Version: version, ProfilesFile: g.a.recordsFile, LastDir: g.lastDir, Profiles: []guiProfile{}}
 	for _, r := range g.a.records {
-		s.Profiles = append(s.Profiles, guiProfile{r.Label, r.Folder, g.a.codeFolder(r), r.Created, r.LastUsed, desktopRunning(r.Folder)})
+		s.Profiles = append(s.Profiles, guiProfile{r.Label, r.Folder, g.a.codeFolder(r), r.Created, r.LastUsed, desktopRunning(r.Folder), r.existingRecentDirs()})
 	}
 	return s
 }
@@ -146,6 +148,16 @@ func (g *gui) rename(label, newLabel string) (guiState, error) {
 		return g.state(), err
 	}
 	return g.state(), g.a.renameProfile(r, newLabel)
+}
+
+// forgetRecent drops one folder from a profile's recent Claude Code folders.
+func (g *gui) forgetRecent(label, dir string) (guiState, error) {
+	r, err := g.record(label)
+	if err != nil {
+		return g.state(), err
+	}
+	r.forgetRecentDir(dir)
+	return g.state(), g.a.save()
 }
 
 func (g *gui) remove(label string) (guiState, error) {

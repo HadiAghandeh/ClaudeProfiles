@@ -49,6 +49,9 @@ type Record struct {
 	Folder   string `json:"folder"`
 	Created  string `json:"created"`
 	LastUsed string `json:"lastUsed"`
+	// RecentDirs are the latest Claude Code project folders, newest first.
+	// The PowerShell script keeps this field when it rewrites the file.
+	RecentDirs []string `json:"recentDirs,omitempty"`
 }
 
 type app struct {
@@ -423,7 +426,48 @@ func (a *app) launchCode(r *Record, workDir string) error {
 		return err
 	}
 	fmt.Printf("Started Claude Code as %s in %s\n", r.Label, workDir)
+	r.addRecentDir(workDir)
 	return a.touch(r)
+}
+
+// maxRecentDirs is how many Claude Code project folders each profile remembers.
+const maxRecentDirs = 5
+
+// addRecentDir moves dir to the front of the profile's recent Claude Code
+// folders (ignoring case and trailing slashes, as Windows does), keeping at
+// most maxRecentDirs.
+func (r *Record) addRecentDir(dir string) {
+	dir = filepath.Clean(dir)
+	list := []string{dir}
+	for _, d := range r.RecentDirs {
+		if !strings.EqualFold(filepath.Clean(d), dir) && len(list) < maxRecentDirs {
+			list = append(list, d)
+		}
+	}
+	r.RecentDirs = list
+}
+
+// forgetRecentDir removes dir from the profile's recent folders.
+func (r *Record) forgetRecentDir(dir string) {
+	var list []string
+	for _, d := range r.RecentDirs {
+		if !strings.EqualFold(filepath.Clean(d), filepath.Clean(dir)) {
+			list = append(list, d)
+		}
+	}
+	r.RecentDirs = list
+}
+
+// existingRecentDirs returns the recent folders that still exist, so moved or
+// deleted projects aren't offered.
+func (r *Record) existingRecentDirs() []string {
+	list := []string{}
+	for _, d := range r.RecentDirs {
+		if info, err := os.Stat(d); err == nil && info.IsDir() {
+			list = append(list, d)
+		}
+	}
+	return list
 }
 
 func startDetached(cmd *exec.Cmd, newConsole bool) error {
@@ -546,8 +590,26 @@ func (a *app) pickCode(i int) (bool, error) {
 		time.Sleep(time.Second)
 		return false, nil
 	}
-	dir := strings.Trim(a.prompt("Project folder for Claude Code (blank = your home folder): "), `"`)
+	dir := a.promptDir(a.records[i])
 	return true, a.launchCode(a.records[i], dir)
+}
+
+// promptDir asks for a Claude Code project folder, offering the profile's
+// recent folders by number.
+func (a *app) promptDir(r *Record) string {
+	recent := r.existingRecentDirs()
+	if len(recent) == 0 {
+		return strings.Trim(a.prompt("Project folder for Claude Code (blank = your home folder): "), `"`)
+	}
+	fmt.Println("Recent folders:")
+	for i, d := range recent {
+		fmt.Printf("  %d)  %s\n", i+1, d)
+	}
+	ans := strings.Trim(a.prompt("Type a number, another folder, or leave blank for your home folder: "), `"`)
+	if n, err := strconv.Atoi(ans); err == nil && n >= 1 && n <= len(recent) {
+		return recent[n-1]
+	}
+	return ans
 }
 
 func safeFolderName(label string) string {
@@ -686,7 +748,7 @@ func (a *app) shortcutPrompt() error {
 	code := strings.HasPrefix(strings.ToLower(a.prompt("Shortcut for [D]esktop app or Claude [C]ode? (default D): ")), "c")
 	dir := ""
 	if code {
-		dir = strings.Trim(a.prompt("Project folder (blank = your home folder): "), `"`)
+		dir = a.promptDir(r)
 	}
 	where := "both"
 	switch strings.ToLower(a.prompt("Put it on the [D]esktop, in the [S]tart menu, or [B]oth? (default B): ")) {

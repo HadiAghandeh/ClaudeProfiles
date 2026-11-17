@@ -42,6 +42,7 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 - 🖼️ **Desktop app with a real window** — `claude-profiles-gui.exe` lists your profiles with one-click **Claude Desktop** and **Claude Code** buttons, a folder picker, and light/dark mode.
 - 🚀 **Desktop and Start menu shortcuts per account** — one click creates a shortcut like `Claude - work@company.com` or `Claude Code - work@company.com`, so each account opens straight from the Desktop, the Start menu or Windows search, and can be pinned to the taskbar. Removing a profile removes its shortcuts. [See how ↓](#desktop-shortcuts-per-account)
 - 💻 **Claude Code profile switcher** — start the `claude` CLI as any profile in a new terminal (Windows Terminal when available).
+- 📂 **Recent project folders** — each profile remembers its last 5 Claude Code folders and offers them in one click (or by number in the terminal), so switching between projects is instant.
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
 - 🟢 **See what's open** — profiles with Claude Desktop currently running are marked **Open**, updated live in the window (and with `*` in the terminal menu).
 - ✏️ **Rename profiles** — change a profile's email or name without signing out; its data stays put and its shortcuts are renamed to match.
@@ -81,7 +82,7 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 
 The release zip contains two programs built from the same Go code:
 
-- **`claude-profiles-gui.exe`** — a desktop window. Add a profile by email, then click **Claude Desktop** or **Claude Code** next to it. Claude Code asks for a project folder (type it or click **Browse…**). Profiles with Claude Desktop running show a green **Open** marker. Hover a name and click the pencil to rename it (Enter saves, Esc cancels). The shortcut icon creates Desktop and Start menu shortcuts for a profile, the trash icon removes a profile after confirmation, and **Open main Claude Desktop** starts your normal profile. It follows the Windows light/dark theme. Started with `-profile` it launches directly without opening the window, which is handy for shortcuts.
+- **`claude-profiles-gui.exe`** — a desktop window. Add a profile by email, then click **Claude Desktop** or **Claude Code** next to it. Claude Code asks for a project folder: it starts with the profile's most recent one, lists its last 5 under **Recent folders** (click to pick, double-click to start, × to forget), or type one or click **Browse…**. Profiles with Claude Desktop running show a green **Open** marker. Hover a name and click the pencil to rename it (Enter saves, Esc cancels). The shortcut icon creates Desktop and Start menu shortcuts for a profile, the trash icon removes a profile after confirmation, and **Open main Claude Desktop** starts your normal profile. It follows the Windows light/dark theme. Started with `-profile` it launches directly without opening the window, which is handy for shortcuts.
 - **`claude-profiles.exe`** — the terminal version below.
 
 `claude-profiles.exe` has the same menu and features as the PowerShell script, in a single file with no dependencies. Both use the same `profiles.json` format and data folders, so you can switch between them (put the `.exe` next to `start.bat` to share one profile list).
@@ -175,6 +176,7 @@ Every profile works for Claude Code too. Picking `C1` (or running `start.bat -Pr
 
 - `CLAUDE_CONFIG_DIR` points to `%LOCALAPPDATA%\Claude-Code-Data\<profile>`, so login, `settings.json`, MCP servers, memory and history are separate per account;
 - the terminal starts in the project folder you chose, and `claude` is launched for you;
+- with the Go app, the folder is added to that profile's recent folders (up to 5, newest first, stored as `recentDirs` in `profiles.json`) and offered next time, skipping folders that no longer exist (the PowerShell script keeps this list intact but doesn't add to it);
 - the window title shows which account it is, e.g. `Claude Code - work@company.com`.
 
 The first time you open Claude Code for a profile, run `/login` and sign in with that account. Claude Desktop and Claude Code logins are independent, so sign in to each once.

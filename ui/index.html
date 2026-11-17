@@ -145,6 +145,20 @@
   .warn { color: var(--danger); background: var(--danger-bg); border-radius: 8px; padding: 8px 10px; }
   label.small { font-size: 12.5px; color: var(--muted); }
 
+  .recents { display: grid; gap: 2px; margin-top: -4px; }
+  #scRecents { margin-top: 8px; }
+  .recents .small { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+  .recent { display: flex; align-items: center; border-radius: 8px; }
+  .recent:hover, .recent.on { background: var(--surface-2); }
+  .recent button.pick {
+    flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px;
+    border: none; background: none; padding: 6px 8px; text-align: left; font-weight: 400;
+  }
+  .recent .dir-name { font-weight: 600; white-space: nowrap; }
+  .recent .dir-path { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .recent button.icon { padding: 4px 7px; opacity: 0; }
+  .recent:hover button.icon, .recent button.icon:focus-visible { opacity: 1; }
+
   #toast {
     position: fixed; left: 50%; bottom: 58px; transform: translate(-50%, 12px);
     background: var(--text); color: var(--bg); border-radius: 8px; padding: 8px 14px;
@@ -189,6 +203,7 @@
         <input type="text" id="codeDir" spellcheck="false">
         <button type="button" id="browseBtn">Browse…</button>
       </div>
+      <div class="recents" id="codeRecents" hidden></div>
       <p>Opens a terminal running <b>claude</b> with this profile's own settings. The first time, sign in with <b>/login</b>.</p>
       <p class="warn" id="codeErr" role="alert" hidden></p>
       <div class="buttons">
@@ -227,6 +242,7 @@
           <input type="text" id="scDir" spellcheck="false">
           <button type="button" id="scBrowse">Browse…</button>
         </div>
+        <div class="recents" id="scRecents" hidden></div>
       </div>
       <fieldset class="choice">
         <legend class="small">Put it on</legend>
@@ -389,10 +405,48 @@
 
   $("mainBtn").onclick = () => run($("mainBtn"), () => window.startMain(), "Started your main Claude Desktop");
 
+  // Recent Claude Code folders for profile p, under a folder field. Click one
+  // to use it; double-click starts right away (when form is given); × forgets it.
+  const sameDir = (a, b) => a.replace(/[\\/]+$/, "").toLowerCase() === b.replace(/[\\/]+$/, "").toLowerCase();
+  function renderRecents(box, input, p, form) {
+    const dirs = p.recentDirs || [];
+    box.replaceChildren();
+    box.hidden = dirs.length === 0;
+    if (!dirs.length) return;
+    box.append(el("div", { className: "small", textContent: "Recent folders" }));
+    const mark = () => {
+      for (const row of box.querySelectorAll(".recent")) row.classList.toggle("on", sameDir(row.dataset.dir, input.value.trim()));
+    };
+    for (const d of dirs) {
+      const name = d.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || d;
+      const pick = el("button", { type: "button", className: "pick", title: d },
+        el("span", { className: "dir-name", textContent: name }),
+        el("span", { className: "dir-path", textContent: d }));
+      pick.onclick = () => { input.value = d; mark(); };
+      if (form) pick.ondblclick = () => { input.value = d; form.requestSubmit(); };
+      const x = el("button", { type: "button", className: "icon", title: "Remove from recent folders", ariaLabel: "Remove " + d + " from recent folders", textContent: "×" });
+      x.onclick = async () => {
+        try {
+          state = await window.forgetRecent(p.label, d);
+          const fresh = state.profiles.find((q) => q.label === p.label);
+          if (fresh) p.recentDirs = fresh.recentDirs;
+          renderRecents(box, input, p, form);
+          input.focus();
+        } catch (e) { toast(errText(e), true); }
+      };
+      const row = el("div", { className: "recent" }, pick, x);
+      row.dataset.dir = d;
+      box.append(row);
+    }
+    input.oninput = mark;
+    mark();
+  }
+
   function openCode(p) {
     codeFor = p;
     $("codeTitle").textContent = "Open Claude Code as " + p.label;
-    if (!$("codeDir").value) $("codeDir").value = state.lastDir || "";
+    $("codeDir").value = (p.recentDirs && p.recentDirs[0]) || state.lastDir || "";
+    renderRecents($("codeRecents"), $("codeDir"), p, $("codeForm"));
     $("codeErr").hidden = true;
     $("codeDlg").showModal();
     $("codeDir").select();
@@ -410,7 +464,10 @@
   window.onFolderPicked = (path) => {
     $("browseBtn").disabled = $("scBrowse").disabled = false;
     if (pickTarget) {
-      if (path) pickTarget.value = path;
+      if (path) {
+        pickTarget.value = path;
+        pickTarget.dispatchEvent(new Event("input")); // re-mark the matching recent folder
+      }
       pickTarget.focus();
     }
   };
@@ -434,6 +491,7 @@
   function openShortcut(p) {
     scFor = p;
     $("scTitle").textContent = "Create shortcut for " + p.label;
+    renderRecents($("scRecents"), $("scDir"), p, null);
     $("scErr").hidden = true;
     syncShortcutForm();
     $("scDlg").showModal();

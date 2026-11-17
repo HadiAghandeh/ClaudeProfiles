@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"unicode/utf16"
 )
@@ -130,6 +132,52 @@ func TestRenameProfile(t *testing.T) {
 	}
 	if err := run(options{rename: "x"}); err == nil {
 		t.Fatal("want an error for -rename without -profile")
+	}
+}
+
+func TestRecentDirs(t *testing.T) {
+	base := t.TempDir()
+	dirs := make([]string, 7)
+	for i := range dirs {
+		dirs[i] = filepath.Join(base, fmt.Sprintf("proj%d", i))
+		if err := os.Mkdir(dirs[i], 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := &Record{Label: "x"}
+	for _, d := range dirs {
+		r.addRecentDir(d)
+	}
+	if len(r.RecentDirs) != maxRecentDirs || r.RecentDirs[0] != dirs[6] || r.RecentDirs[4] != dirs[2] {
+		t.Fatalf("newest first, capped: %v", r.RecentDirs)
+	}
+	// Re-using a folder (with different case and a trailing slash) moves it
+	// to the front instead of adding a duplicate.
+	r.addRecentDir(strings.ToUpper(dirs[4]) + string(filepath.Separator))
+	if len(r.RecentDirs) != maxRecentDirs || !strings.EqualFold(r.RecentDirs[0], dirs[4]) {
+		t.Fatalf("moved to front: %v", r.RecentDirs)
+	}
+	for _, d := range r.RecentDirs[1:] {
+		if strings.EqualFold(d, dirs[4]) {
+			t.Fatalf("duplicate kept: %v", r.RecentDirs)
+		}
+	}
+
+	r.forgetRecentDir(dirs[6])
+	if len(r.RecentDirs) != maxRecentDirs-1 {
+		t.Fatalf("forget: %v", r.RecentDirs)
+	}
+	// Folders that no longer exist are not offered.
+	if err := os.Remove(dirs[5]); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range r.existingRecentDirs() {
+		if d == dirs[5] {
+			t.Fatalf("deleted folder offered: %v", r.existingRecentDirs())
+		}
+	}
+	if got := len(r.existingRecentDirs()); got != maxRecentDirs-2 {
+		t.Fatalf("existing = %d, want %d", got, maxRecentDirs-2)
 	}
 }
 
