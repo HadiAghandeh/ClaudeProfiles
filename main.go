@@ -80,7 +80,19 @@ func main() {
 	}
 
 	interactive := *profile == "" && !*list
+	if guiBuild && interactive {
+		// claude-profiles-gui.exe without arguments opens the window.
+		if err := runGUI(*records); err != nil {
+			showError(err.Error())
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(*profile, *code, *dir, *list, *records); err != nil {
+		if guiBuild { // no console to print to
+			showError(err.Error())
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		if interactive {
 			// Keep a double-clicked window open long enough to read the error.
@@ -91,16 +103,25 @@ func main() {
 	}
 }
 
-func run(profile string, code bool, dir string, list bool, recordsFile string) error {
+// openApp loads profiles.json and adds any profile folders found on disk.
+func openApp(recordsFile string) (*app, error) {
 	a, err := newApp(recordsFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := a.load(); err != nil {
-		return err
+		return nil, err
 	}
 	a.discover()
 	if err := a.save(); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func run(profile string, code bool, dir string, list bool, recordsFile string) error {
+	a, err := openApp(recordsFile)
+	if err != nil {
 		return err
 	}
 
@@ -466,15 +487,16 @@ func safeFolderName(label string) string {
 	return s
 }
 
-func (a *app) addProfile() (bool, error) {
-	label := a.prompt("Email or name for the new user (blank to cancel): ")
+var errExists = errors.New("a user with that name already exists")
+
+// createProfile records a new user and creates its Claude Desktop data folder.
+func (a *app) createProfile(label string) (*Record, error) {
+	label = strings.TrimSpace(label)
 	if label == "" {
-		return false, nil
+		return nil, errors.New("enter an email or name")
 	}
 	if a.find(label) != nil {
-		fmt.Printf("A user named %s already exists.\n", label)
-		time.Sleep(2 * time.Second)
-		return false, nil
+		return nil, errExists
 	}
 	safe := safeFolderName(label)
 	folder := filepath.Join(a.dataRoot, safe)
@@ -482,14 +504,44 @@ func (a *app) addProfile() (bool, error) {
 		folder = filepath.Join(a.dataRoot, fmt.Sprintf("%s-%d", safe, n))
 	}
 	if err := os.MkdirAll(folder, 0o755); err != nil {
-		return false, err
+		return nil, err
 	}
 	r := &Record{Label: label, Folder: folder, Created: time.Now().Format("2006-01-02")}
 	a.records = append(a.records, r)
-	if err := a.save(); err != nil {
+	return r, a.save()
+}
+
+// deleteProfile removes a user's Desktop and Code data folders and its record.
+func (a *app) deleteProfile(r *Record) error {
+	for _, d := range []string{r.Folder, a.codeFolder(r)} {
+		if err := os.RemoveAll(d); err != nil {
+			return err
+		}
+	}
+	for i, x := range a.records {
+		if x == r {
+			a.records = append(a.records[:i], a.records[i+1:]...)
+			break
+		}
+	}
+	return a.save()
+}
+
+func (a *app) addProfile() (bool, error) {
+	label := a.prompt("Email or name for the new user (blank to cancel): ")
+	if label == "" {
+		return false, nil
+	}
+	r, err := a.createProfile(label)
+	if errors.Is(err, errExists) {
+		fmt.Printf("A user named %s already exists.\n", label)
+		time.Sleep(2 * time.Second)
+		return false, nil
+	}
+	if err != nil {
 		return false, err
 	}
-	fmt.Printf("Added %s  ->  %s\n", label, folder)
+	fmt.Printf("Added %s  ->  %s\n", label, r.Folder)
 
 	switch ans := strings.ToLower(a.prompt("Start it now and sign in? [D]esktop / [C]ode / [N]o (default D): ")); {
 	case ans == "" || strings.HasPrefix(ans, "d") || strings.HasPrefix(ans, "y"):
@@ -520,13 +572,7 @@ func (a *app) removeProfile() error {
 		fmt.Println("Cancelled.")
 		return nil
 	}
-	for _, d := range []string{r.Folder, codeDir} {
-		if err := os.RemoveAll(d); err != nil {
-			return err
-		}
-	}
-	a.records = append(a.records[:n-1], a.records[n:]...)
-	if err := a.save(); err != nil {
+	if err := a.deleteProfile(r); err != nil {
 		return err
 	}
 	fmt.Printf("Removed %s.\n", r.Label)

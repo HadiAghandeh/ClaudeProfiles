@@ -1,4 +1,5 @@
-# GoReleaser config: builds claude-profiles.exe for Windows and publishes a
+# GoReleaser config: builds claude-profiles.exe (terminal) and
+# claude-profiles-gui.exe (window) for Windows and publishes a
 # GitHub release when a tag like v1.2.3 is pushed. See .github/workflows/release.yml.
 version: 2
 
@@ -24,6 +25,24 @@ builds:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{ .Version }}
+
+  # Windowed version: same code built with the gui tag, no console window.
+  - id: claude-profiles-gui
+    main: .
+    binary: claude-profiles-gui
+    tags:
+      - gui
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -H=windowsgui -X main.version={{ .Version }}
 
 archives:
   - id: default

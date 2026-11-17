@@ -33,6 +33,7 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 ## Features
 
 - 🧑‍🤝‍🧑 **Multiple Claude accounts at once** — each profile opens in its own window.
+- 🖼️ **Desktop app with a real window** — `claude-profiles-gui.exe` lists your profiles with one-click **Claude Desktop** and **Claude Code** buttons, a folder picker, and light/dark mode.
 - 💻 **Claude Code profile switcher** — start the `claude` CLI as any profile in a new terminal (Windows Terminal when available).
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
 - 📋 **Simple interactive menu** — pick a user by number, add (`A`), remove (`R`), or open your main profile (`M`).
@@ -50,13 +51,15 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 - Windows PowerShell 5.1 or later (pre-installed on Windows)
 - Optional: [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) for the Claude Code profiles
 - Optional: Windows Terminal (used for Claude Code tabs when installed)
+- For the windowed app: Microsoft Edge WebView2 Runtime (already included in Windows 11 and up-to-date Windows 10)
 
 ## Installation
 
 **Option A — Go executable (recommended):**
 
 1. Download `claude-profiles_<version>_windows_amd64.zip` (or `_arm64` for ARM PCs) from the [latest release](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest).
-2. Unzip it to a folder of your choice and double-click `claude-profiles.exe`.
+2. Unzip it to a folder of your choice.
+3. Double-click **`claude-profiles-gui.exe`** for the windowed app, or run `claude-profiles.exe` for the terminal menu.
 
 **Option B — PowerShell script:**
 
@@ -67,6 +70,11 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 2. Double-click `start.bat`. No build step — keep the files together in one folder.
 
 ## Go version (.exe)
+
+The release zip contains two programs built from the same Go code:
+
+- **`claude-profiles-gui.exe`** — a desktop window. Add a profile by email, then click **Claude Desktop** or **Claude Code** next to it. Claude Code asks for a project folder (type it or click **Browse…**). The trash icon removes a profile after confirmation, and **Open main Claude Desktop** starts your normal profile. It follows the Windows light/dark theme. Started with `-profile` it launches directly without opening the window, which is handy for shortcuts.
+- **`claude-profiles.exe`** — the terminal version below.
 
 `claude-profiles.exe` has the same menu and features as the PowerShell script, in a single file with no dependencies. Both use the same `profiles.json` format and data folders, so you can switch between them (put the `.exe` next to `start.bat` to share one profile list).
 
@@ -85,6 +93,12 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 ```bash
 go build -o claude-profiles.exe .
 ```
+
+```bash
+go build -tags gui -ldflags "-H=windowsgui" -o claude-profiles-gui.exe .
+```
+
+The window is plain HTML in [`ui/index.html`](ui/index.html), embedded into the `.exe` and shown with [WebView2](https://github.com/jchv/go-webview2) (no CGO, so it cross-compiles).
 
 **Publishing a release:** releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions. Push a version tag and the workflow attaches the zips and checksums to a new GitHub release:
 

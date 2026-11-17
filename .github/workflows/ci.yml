@@ -22,8 +22,14 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Vet (GUI build)
+        run: go vet -tags gui ./...
+
       - name: Test
         run: go test ./...
 
       - name: Build
         run: go build -o claude-profiles.exe .
+
+      - name: Build GUI
+        run: go build -tags gui -ldflags "-H=windowsgui" -o claude-profiles-gui.exe .
