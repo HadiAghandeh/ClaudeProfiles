@@ -16,6 +16,7 @@
 //	claude-profiles -profile a@second.com -code      start that user's Claude Code in the current folder
 //	claude-profiles -profile a@second.com -code -dir C:\src\app
 //	claude-profiles -profile a@second.com -shortcut both    Desktop + Start menu shortcuts (add -code for Claude Code)
+//	claude-profiles -profile a@second.com -rename b@second.com   rename (data and sign-in kept)
 //	claude-profiles -list                            list the profiles and exit
 package main
 
@@ -73,6 +74,7 @@ func main() {
 	list := flag.Bool("list", false, "list the profiles and exit")
 	records := flag.String("profiles-file", "", "path to profiles.json (default: next to the executable)")
 	shortcut := flag.String("shortcut", "", "with -profile: create a shortcut instead of starting it: desktop, start or both")
+	rename := flag.String("rename", "", "with -profile: give that user this new email or name (data and sign-in are kept)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -82,7 +84,7 @@ func main() {
 	}
 
 	interactive := *profile == "" && !*list
-	if guiBuild && interactive && *shortcut == "" {
+	if guiBuild && interactive && *shortcut == "" && *rename == "" {
 		// claude-profiles-gui.exe without arguments opens the window.
 		if err := runGUI(*records); err != nil {
 			showError(err.Error())
@@ -90,7 +92,7 @@ func main() {
 		}
 		return
 	}
-	opts := options{profile: *profile, code: *code, dir: *dir, list: *list, recordsFile: *records, shortcut: *shortcut}
+	opts := options{profile: *profile, code: *code, dir: *dir, list: *list, recordsFile: *records, shortcut: *shortcut, rename: *rename}
 	if err := run(opts); err != nil {
 		if guiBuild { // no console to print to
 			showError(err.Error())
@@ -124,13 +126,16 @@ func openApp(recordsFile string) (*app, error) {
 
 // options are the command-line flags.
 type options struct {
-	profile, dir, recordsFile, shortcut string
-	code, list                          bool
+	profile, dir, recordsFile, shortcut, rename string
+	code, list                                  bool
 }
 
 func run(o options) error {
 	if o.shortcut != "" && o.profile == "" {
 		return errors.New("-shortcut needs -profile")
+	}
+	if o.rename != "" && o.profile == "" {
+		return errors.New("-rename needs -profile")
 	}
 	a, err := openApp(o.recordsFile)
 	if err != nil {
@@ -145,6 +150,14 @@ func run(o options) error {
 		r := a.find(o.profile)
 		if r == nil {
 			return fmt.Errorf("no user named %q; run without arguments to see the list or add it", o.profile)
+		}
+		if o.rename != "" {
+			old := r.Label
+			if err := a.renameProfile(r, o.rename); err != nil {
+				return err
+			}
+			fmt.Printf("Renamed %s to %s\n", old, r.Label)
+			return nil
 		}
 		if o.shortcut != "" {
 			return a.makeShortcuts(r, o.shortcut, o.code, o.dir)
@@ -299,9 +312,13 @@ func (a *app) codeFolder(r *Record) string {
 
 func (a *app) printList() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "LABEL\tFOLDER\tCODE FOLDER\tCREATED\tLAST USED")
+	fmt.Fprintln(w, "LABEL\tDESKTOP\tFOLDER\tCODE FOLDER\tCREATED\tLAST USED")
 	for _, r := range a.records {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Label, r.Folder, a.codeFolder(r), r.Created, r.LastUsed)
+		state := "-"
+		if desktopRunning(r.Folder) {
+			state = "running"
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Label, state, r.Folder, a.codeFolder(r), r.Created, r.LastUsed)
 	}
 	w.Flush()
 }
@@ -465,6 +482,11 @@ func (a *app) menu() error {
 				return err
 			}
 			a.prompt("Press Enter to continue")
+		case strings.EqualFold(choice, "n"):
+			if err := a.renamePrompt(); err != nil {
+				fmt.Println("Error:", err)
+			}
+			a.prompt("Press Enter to continue")
 		case strings.EqualFold(choice, "s"):
 			if err := a.shortcutPrompt(); err != nil {
 				fmt.Println("Error:", err)
@@ -500,14 +522,18 @@ func (a *app) showMenu() {
 		if r.LastUsed != "" {
 			when = "last used " + r.LastUsed
 		}
+		if desktopRunning(r.Folder) {
+			when = "* running   " + when
+		}
 		fmt.Printf("  %2d)  %-32s %s\n", i+1, r.Label, when)
 	}
 	fmt.Println()
-	fmt.Println("   1, 2, ...   Claude Desktop as that user")
+	fmt.Println("   1, 2, ...   Claude Desktop as that user (* = already open)")
 	fmt.Println("  C1, C2, ...  Claude Code as that user (opens a terminal)")
 	fmt.Println()
 	fmt.Println("   M)  Main Claude Desktop (your normal profile)")
 	fmt.Println("   A)  Add a new user")
+	fmt.Println("   N)  Rename a user")
 	fmt.Println("   R)  Remove a user")
 	fmt.Println("   S)  Create a Desktop / Start menu shortcut")
 	fmt.Println("   Q)  Quit")
@@ -556,6 +582,32 @@ func (a *app) createProfile(label string) (*Record, error) {
 	return r, a.save()
 }
 
+// renameProfile changes a user's label. Its data folders stay where they are
+// (so it stays signed in); its shortcuts are renamed to match. The record is
+// saved first, so a shortcut problem is reported without undoing the rename.
+func (a *app) renameProfile(r *Record, newLabel string) error {
+	newLabel = strings.TrimSpace(newLabel)
+	if newLabel == "" {
+		return errors.New("enter an email or name")
+	}
+	if newLabel == r.Label {
+		return nil
+	}
+	if other := a.find(newLabel); other != nil && other != r {
+		return errExists
+	}
+	oldLabel := r.Label
+	r.Label = newLabel
+	if err := a.save(); err != nil {
+		r.Label = oldLabel
+		return err
+	}
+	if err := renameShortcuts(oldLabel, newLabel); err != nil {
+		return fmt.Errorf("renamed, but %w", err)
+	}
+	return nil
+}
+
 // deleteProfile removes a user's Desktop and Code data folders, its shortcuts
 // and its record.
 func (a *app) deleteProfile(r *Record) error {
@@ -597,6 +649,28 @@ func (a *app) addProfile() (bool, error) {
 		return a.pickCode(len(a.records) - 1)
 	}
 	return false, nil
+}
+
+func (a *app) renamePrompt() error {
+	n, err := strconv.Atoi(a.prompt("Number of the user to rename (blank to cancel): "))
+	if err != nil {
+		return nil
+	}
+	if n < 1 || n > len(a.records) {
+		fmt.Println("No such number.")
+		return nil
+	}
+	r := a.records[n-1]
+	newLabel := a.prompt(fmt.Sprintf("New email or name for %s (blank to cancel): ", r.Label))
+	if newLabel == "" {
+		return nil
+	}
+	old := r.Label
+	if err := a.renameProfile(r, newLabel); err != nil {
+		return err
+	}
+	fmt.Printf("Renamed %s to %s. It stays signed in.\n", old, r.Label)
+	return nil
 }
 
 func (a *app) shortcutPrompt() error {

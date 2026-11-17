@@ -14,3 +14,5 @@ func (a *app) createShortcut(r *Record, place string, code bool, dir string) (st
 }
 
 func removeShortcuts(label string) {}
+
+func renameShortcuts(oldLabel, newLabel string) error { return nil }

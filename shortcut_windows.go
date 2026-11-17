@@ -135,6 +135,58 @@ $s.Save()`
 	return path, nil
 }
 
+// renameShortcuts moves a profile's existing shortcuts to the new name and
+// points them at the new label, keeping everything else (folder, target).
+func renameShortcuts(oldLabel, newLabel string) error {
+	const script = `$ErrorActionPreference = 'Stop'
+$sh = New-Object -ComObject WScript.Shell
+$o = $sh.CreateShortcut($env:LNK_OLD)
+$n = $sh.CreateShortcut($env:LNK_NEW)
+$n.TargetPath = $o.TargetPath
+$n.Arguments = $o.Arguments.Replace($env:ARG_OLD, $env:ARG_NEW)
+$n.WorkingDirectory = $o.WorkingDirectory
+$n.IconLocation = $o.IconLocation
+$n.Description = $o.Description.Replace($env:LABEL_OLD, $env:LABEL_NEW)
+$n.Save()
+if ($env:DELETE_OLD -eq '1') { Remove-Item -LiteralPath $env:LNK_OLD }`
+	var failed []string
+	for _, place := range []string{placeDesktop, placeStart} {
+		folder, err := shortcutDir(place)
+		if err != nil {
+			continue
+		}
+		for _, code := range []bool{false, true} {
+			oldPath := filepath.Join(folder, shortcutName(oldLabel, code))
+			newPath := filepath.Join(folder, shortcutName(newLabel, code))
+			if !exists(oldPath) {
+				continue
+			}
+			deleteOld := "1"
+			if strings.EqualFold(oldPath, newPath) { // only the letter case changed: same file
+				deleteOld = "0"
+			}
+			cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePS(script))
+			cmd.Env = append(os.Environ(),
+				"LNK_OLD="+oldPath,
+				"LNK_NEW="+newPath,
+				"ARG_OLD=-profile "+windows.EscapeArg(oldLabel),
+				"ARG_NEW=-profile "+windows.EscapeArg(newLabel),
+				"LABEL_OLD="+oldLabel,
+				"LABEL_NEW="+newLabel,
+				"DELETE_OLD="+deleteOld,
+			)
+			cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+			if out, err := cmd.CombinedOutput(); err != nil {
+				failed = append(failed, filepath.Base(oldPath)+": "+strings.TrimSpace(string(out)))
+			}
+		}
+	}
+	if len(failed) > 0 {
+		return errors.New("could not update shortcuts: " + strings.Join(failed, "; "))
+	}
+	return nil
+}
+
 // removeShortcuts deletes the Desktop and Start menu shortcuts this app made
 // for label. Errors are ignored: a missing shortcut is fine.
 func removeShortcuts(label string) {

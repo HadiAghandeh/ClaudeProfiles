@@ -43,7 +43,9 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 - 🚀 **Desktop and Start menu shortcuts per account** — one click creates a shortcut like `Claude - work@company.com` or `Claude Code - work@company.com`, so each account opens straight from the Desktop, the Start menu or Windows search, and can be pinned to the taskbar. Removing a profile removes its shortcuts. [See how ↓](#desktop-shortcuts-per-account)
 - 💻 **Claude Code profile switcher** — start the `claude` CLI as any profile in a new terminal (Windows Terminal when available).
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
-- 📋 **Simple interactive menu** — pick a user by number, add (`A`), remove (`R`), create shortcuts (`S`), or open your main profile (`M`).
+- 🟢 **See what's open** — profiles with Claude Desktop currently running are marked **Open**, updated live in the window (and with `*` in the terminal menu).
+- ✏️ **Rename profiles** — change a profile's email or name without signing out; its data stays put and its shortcuts are renamed to match.
+- 📋 **Simple interactive menu** — pick a user by number, add (`A`), rename (`N`), remove (`R`), create shortcuts (`S`), or open your main profile (`M`).
 - 🔍 **Auto-discovery** — existing profile folders on disk are picked up automatically.
 - 🕒 **Last-used tracking** — the menu shows when each profile was last opened.
 - 🪶 **No install, no dependencies** — download one `.exe`, or use the PowerShell script that ships with Windows.
@@ -79,7 +81,7 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 
 The release zip contains two programs built from the same Go code:
 
-- **`claude-profiles-gui.exe`** — a desktop window. Add a profile by email, then click **Claude Desktop** or **Claude Code** next to it. Claude Code asks for a project folder (type it or click **Browse…**). The shortcut icon creates Desktop and Start menu shortcuts for a profile, the trash icon removes a profile after confirmation, and **Open main Claude Desktop** starts your normal profile. It follows the Windows light/dark theme. Started with `-profile` it launches directly without opening the window, which is handy for shortcuts.
+- **`claude-profiles-gui.exe`** — a desktop window. Add a profile by email, then click **Claude Desktop** or **Claude Code** next to it. Claude Code asks for a project folder (type it or click **Browse…**). Profiles with Claude Desktop running show a green **Open** marker. Hover a name and click the pencil to rename it (Enter saves, Esc cancels). The shortcut icon creates Desktop and Start menu shortcuts for a profile, the trash icon removes a profile after confirmation, and **Open main Claude Desktop** starts your normal profile. It follows the Windows light/dark theme. Started with `-profile` it launches directly without opening the window, which is handy for shortcuts.
 - **`claude-profiles.exe`** — the terminal version below.
 
 `claude-profiles.exe` has the same menu and features as the PowerShell script, in a single file with no dependencies. Both use the same `profiles.json` format and data folders, so you can switch between them (put the `.exe` next to `start.bat` to share one profile list).
@@ -90,7 +92,8 @@ The release zip contains two programs built from the same Go code:
 | `claude-profiles.exe -profile work@company.com` | Starts that account's Claude Desktop |
 | `claude-profiles.exe -profile work@company.com -code` | Starts that account's Claude Code in the current folder |
 | `claude-profiles.exe -profile work@company.com -code -dir C:\src\app` | Starts that account's Claude Code in `C:\src\app` |
-| `claude-profiles.exe -list` | Prints all profiles and exits |
+| `claude-profiles.exe -list` | Prints all profiles, and whether Claude Desktop is running for each, and exits |
+| `claude-profiles.exe -profile work@company.com -rename new@company.com` | Renames that profile (it stays signed in; shortcuts are updated) |
 | `claude-profiles.exe -profile work@company.com -shortcut both` | Creates Desktop and Start menu shortcuts for that account (`desktop`, `start` or `both`; add `-code` for Claude Code) |
 | `claude-profiles.exe -profiles-file D:\profiles.json` | Uses a different profile list |
 | `claude-profiles.exe -version` | Prints the version |

@@ -33,6 +33,7 @@ type guiProfile struct {
 	CodeFolder string `json:"codeFolder"`
 	Created    string `json:"created"`
 	LastUsed   string `json:"lastUsed"`
+	Running    bool   `json:"running"` // Claude Desktop is open for this profile
 }
 
 type guiState struct {
@@ -81,6 +82,7 @@ func runGUI(recordsFile string) error {
 		"startMain":     g.startMain,
 		"removeProfile": g.remove,
 		"makeShortcuts": g.makeShortcuts,
+		"renameProfile": g.rename,
 		"browseFolder":  g.browseFolder,
 		"openFolder":    g.openFolder,
 	} {
@@ -96,7 +98,7 @@ func runGUI(recordsFile string) error {
 func (g *gui) state() guiState {
 	s := guiState{Version: version, ProfilesFile: g.a.recordsFile, LastDir: g.lastDir, Profiles: []guiProfile{}}
 	for _, r := range g.a.records {
-		s.Profiles = append(s.Profiles, guiProfile{r.Label, r.Folder, g.a.codeFolder(r), r.Created, r.LastUsed})
+		s.Profiles = append(s.Profiles, guiProfile{r.Label, r.Folder, g.a.codeFolder(r), r.Created, r.LastUsed, desktopRunning(r.Folder)})
 	}
 	return s
 }
@@ -137,6 +139,14 @@ func (g *gui) startCode(label, dir string) (guiState, error) {
 }
 
 func (g *gui) startMain() error { return g.a.launchMain() }
+
+func (g *gui) rename(label, newLabel string) (guiState, error) {
+	r, err := g.record(label)
+	if err != nil {
+		return g.state(), err
+	}
+	return g.state(), g.a.renameProfile(r, newLabel)
+}
 
 func (g *gui) remove(label string) (guiState, error) {
 	r, err := g.record(label)

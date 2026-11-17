@@ -93,6 +93,46 @@ func TestCreateAndDeleteProfile(t *testing.T) {
 	}
 }
 
+func TestRenameProfile(t *testing.T) {
+	dir := t.TempDir()
+	a := &app{
+		dataRoot:     filepath.Join(dir, "Claude-Data"),
+		codeDataRoot: filepath.Join(dir, "Claude-Code-Data"),
+		recordsFile:  filepath.Join(dir, "profiles.json"),
+	}
+	r, _ := a.createProfile("zz-rename-a@example.com")
+	other, _ := a.createProfile("zz-rename-b@example.com")
+	folder := r.Folder
+
+	if err := a.renameProfile(r, "  "); err == nil {
+		t.Fatal("blank name: want an error")
+	}
+	if err := a.renameProfile(r, "ZZ-RENAME-B@example.com"); err != errExists {
+		t.Fatalf("taken name: err = %v, want errExists", err)
+	}
+	if err := a.renameProfile(r, " zz-renamed@example.com "); err != nil {
+		t.Fatal(err)
+	}
+	if r.Label != "zz-renamed@example.com" || r.Folder != folder {
+		t.Fatalf("after rename: %+v (folder must not move)", r)
+	}
+	// Changing only the letter case of its own name is allowed.
+	if err := a.renameProfile(other, "ZZ-Rename-B@example.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	b := &app{recordsFile: a.recordsFile}
+	if err := b.load(); err != nil {
+		t.Fatal(err)
+	}
+	if b.find("zz-renamed@example.com") == nil || b.find("zz-rename-a@example.com") != nil {
+		t.Fatalf("saved records: %+v", b.records)
+	}
+	if err := run(options{rename: "x"}); err == nil {
+		t.Fatal("want an error for -rename without -profile")
+	}
+}
+
 // profiles.json written by Windows PowerShell 5.1 has a UTF-8 BOM.
 func TestLoadPowerShellFile(t *testing.T) {
 	dir := t.TempDir()
