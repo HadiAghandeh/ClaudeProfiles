@@ -1,8 +1,11 @@
-# Claude Desktop Multiple Accounts on Windows — Profile Switcher
+# Claude Desktop & Claude Code Multiple Accounts on Windows — Profile Switcher
 
-**Run multiple Claude Desktop accounts side by side on one Windows PC.** This lightweight PowerShell launcher gives every Claude user its own isolated profile — separate login, settings, MCP config and data — so you can switch between work and personal Claude accounts (or several team accounts) without signing out.
+**Run multiple Claude Desktop and Claude Code accounts side by side on one Windows PC.** This lightweight launcher — available as a single-file Go `.exe` or a PowerShell script — gives every Claude user its own isolated profile — separate login, settings, MCP config and data — for both the Claude Desktop app and the Claude Code CLI, so you can switch between work and personal Claude accounts (or several team accounts) without signing out.
 
-> Keywords: Claude Desktop multiple accounts, Claude multi-user, Claude profile manager, switch Claude accounts, run two Claude Desktop instances, Anthropic Claude Windows, `--user-data-dir`, PowerShell launcher.
+[![Release](https://img.shields.io/github/v/release/HadiAghandeh/ClaudeMultiUser)](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest)
+[![CI](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml/badge.svg)](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml)
+
+> Keywords: Claude Desktop multiple accounts, Claude Code multiple accounts, Claude Code switch account, `CLAUDE_CONFIG_DIR`, Claude multi-user, Claude profile manager, switch Claude accounts, run two Claude Desktop instances, Anthropic Claude Windows, `--user-data-dir`, PowerShell launcher, Go CLI.
 
 ---
 
@@ -12,8 +15,10 @@
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Go version (.exe)](#go-version-exe)
 - [Usage](#usage)
 - [Command-line options](#command-line-options)
+- [Claude Code profiles](#claude-code-profiles)
 - [Desktop shortcuts per account](#desktop-shortcuts-per-account)
 - [How it works](#how-it-works)
 - [Where data is stored](#where-data-is-stored)
@@ -23,17 +28,19 @@
 
 ## Why use this
 
-Claude Desktop signs in to one account at a time. If you have a personal Claude Pro account and a company Claude Team or Enterprise account, you normally have to log out and back in every time you switch. This tool launches each account in its **own Claude Desktop window with its own user data folder**, so all your accounts stay signed in and can run at the same time.
+Claude Desktop signs in to one account at a time. If you have a personal Claude Pro account and a company Claude Team or Enterprise account, you normally have to log out and back in every time you switch. This tool launches each account in its **own Claude Desktop window with its own user data folder**, so all your accounts stay signed in and can run at the same time. The same goes for **Claude Code**: each profile opens a terminal with its own Claude Code config folder and login, so `claude` runs as the right account.
 
 ## Features
 
 - 🧑‍🤝‍🧑 **Multiple Claude accounts at once** — each profile opens in its own window.
+- 💻 **Claude Code profile switcher** — start the `claude` CLI as any profile in a new terminal (Windows Terminal when available).
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
 - 📋 **Simple interactive menu** — pick a user by number, add (`A`), remove (`R`), or open your main profile (`M`).
 - ⚡ **Direct launch** — start a specific account from a shortcut with `-Profile`.
 - 🔍 **Auto-discovery** — existing profile folders on disk are picked up automatically.
 - 🕒 **Last-used tracking** — the menu shows when each profile was last opened.
-- 🪶 **No install, no dependencies** — just PowerShell, which ships with Windows.
+- 🪶 **No install, no dependencies** — download one `.exe`, or use the PowerShell script that ships with Windows.
+- 📦 **Prebuilt releases** — Windows x64 and ARM64 binaries on [GitHub Releases](https://github.com/HadiAghandeh/ClaudeMultiUser/releases).
 - 🏪 Works with both the **Microsoft Store** and the **standalone installer** versions of Claude Desktop.
 
 ## Requirements
@@ -41,24 +48,66 @@ Claude Desktop signs in to one account at a time. If you have a personal Claude 
 - Windows 10 or Windows 11
 - [Claude Desktop](https://claude.ai/download) (Microsoft Store or installer build)
 - Windows PowerShell 5.1 or later (pre-installed on Windows)
+- Optional: [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) for the Claude Code profiles
+- Optional: Windows Terminal (used for Claude Code tabs when installed)
 
 ## Installation
+
+**Option A — Go executable (recommended):**
+
+1. Download `claude-profiles_<version>_windows_amd64.zip` (or `_arm64` for ARM PCs) from the [latest release](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest).
+2. Unzip it to a folder of your choice and double-click `claude-profiles.exe`.
+
+**Option B — PowerShell script:**
 
 1. Download or clone this repository:
    ```bash
    git clone https://github.com/HadiAghandeh/ClaudeMultiUser.git
    ```
-2. That's it — no build step. Keep the files together in one folder.
+2. Double-click `start.bat`. No build step — keep the files together in one folder.
+
+## Go version (.exe)
+
+`claude-profiles.exe` has the same menu and features as the PowerShell script, in a single file with no dependencies. Both use the same `profiles.json` format and data folders, so you can switch between them (put the `.exe` next to `start.bat` to share one profile list).
+
+| Command | What it does |
+| --- | --- |
+| `claude-profiles.exe` | Opens the interactive menu |
+| `claude-profiles.exe -profile work@company.com` | Starts that account's Claude Desktop |
+| `claude-profiles.exe -profile work@company.com -code` | Starts that account's Claude Code in the current folder |
+| `claude-profiles.exe -profile work@company.com -code -dir C:\src\app` | Starts that account's Claude Code in `C:\src\app` |
+| `claude-profiles.exe -list` | Prints all profiles and exits |
+| `claude-profiles.exe -profiles-file D:\profiles.json` | Uses a different profile list |
+| `claude-profiles.exe -version` | Prints the version |
+
+**Build from source** (Go 1.22+):
+
+```bash
+go build -o claude-profiles.exe .
+```
+
+**Publishing a release:** releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions. Push a version tag and the workflow attaches the zips and checksums to a new GitHub release:
+
+```bash
+git tag v1.0.0
+```
+
+```bash
+git push origin v1.0.0
+```
 
 ## Usage
 
 Double-click **`start.bat`**. You'll see a menu like this:
 
 ```text
-  Claude Desktop - choose a user
-  ------------------------------
+  Claude - choose a user
+  ----------------------
    1)  work@company.com                 last used 2026-11-17 09:27
    2)  personal@example.com             never used
+
+   1, 2, ...   Claude Desktop as that user
+  C1, C2, ...  Claude Code as that user (opens a terminal)
 
    M)  Main Claude Desktop (your normal profile)
    A)  Add a new user
@@ -66,17 +115,35 @@ Double-click **`start.bat`**. You'll see a menu like this:
    Q)  Quit
 ```
 
-- **Add a user:** press `A`, enter an email or name, then sign in to Claude in the window that opens.
-- **Start a user:** type its number and press Enter.
+- **Add a user:** press `A`, enter an email or name, then choose Desktop or Code and sign in.
+- **Start Claude Desktop as a user:** type its number (e.g. `1`) and press Enter.
+- **Start Claude Code as a user:** type `C` plus its number (e.g. `C1`), then the project folder to open.
 - **Remove a user:** press `R`, pick the number, and type `DELETE` to confirm. This deletes that profile's local data folder (your conversations remain on your Claude account).
 
 ## Command-line options
 
+For the PowerShell script (`start.bat`):
+
+
 | Command | What it does |
 | --- | --- |
 | `start.bat` | Opens the interactive menu |
-| `start.bat -Profile work@company.com` | Starts that account directly, no menu |
+| `start.bat -Profile work@company.com` | Starts that account's Claude Desktop directly, no menu |
+| `start.bat -Profile work@company.com -Code` | Starts that account's Claude Code in the current folder |
+| `start.bat -Profile work@company.com -Code -Dir C:\src\app` | Starts that account's Claude Code in `C:\src\app` |
 | `start.bat -List` | Prints all profiles and exits |
+
+## Claude Code profiles
+
+Every profile works for Claude Code too. Picking `C1` (or running `start.bat -Profile <name> -Code`) opens a new terminal where:
+
+- `CLAUDE_CONFIG_DIR` points to `%LOCALAPPDATA%\Claude-Code-Data\<profile>`, so login, `settings.json`, MCP servers, memory and history are separate per account;
+- the terminal starts in the project folder you chose, and `claude` is launched for you;
+- the window title shows which account it is, e.g. `Claude Code - work@company.com`.
+
+The first time you open Claude Code for a profile, run `/login` and sign in with that account. Claude Desktop and Claude Code logins are independent, so sign in to each once.
+
+> Tip: to use your existing Claude Code setup as a starting point, copy files such as `settings.json` from `%USERPROFILE%\.claude` into the profile's `Claude-Code-Data` folder.
 
 ## Desktop shortcuts per account
 
@@ -89,6 +156,8 @@ Create a Windows shortcut for each Claude account so it opens in one click:
    "C:\path\to\start.bat" -Profile work@company.com
    ```
 4. Optionally change the icon to Claude's and pin it to the taskbar or Start menu.
+
+For a Claude Code shortcut, add `-Code -Dir "C:\path\to\project"` to the target.
 
 ## How it works
 
@@ -106,12 +175,22 @@ The script looks for Claude Desktop in these locations:
 
 If yours is elsewhere, add its path to `$ClaudeCandidates` at the top of `claude-profiles.ps1`.
 
+For Claude Code, the launcher sets the documented `CLAUDE_CONFIG_DIR` environment variable, which tells Claude Code where to keep its config and credentials instead of `~/.claude`:
+
+```powershell
+$env:CLAUDE_CONFIG_DIR = "$env:LOCALAPPDATA\Claude-Code-Data\<profile>"
+claude
+```
+
+It finds `claude` on your `PATH`, or in `%USERPROFILE%\.local\bin` or `%APPDATA%\npm`; add other paths to `$ClaudeCodeCandidates`.
+
 ## Where data is stored
 
 | Item | Location |
 | --- | --- |
-| Profile data (login, settings, cache) | `%LOCALAPPDATA%\Claude-Data\<profile>` |
-| Profile list | `profiles.json` next to the script |
+| Claude Desktop data (login, settings, cache) | `%LOCALAPPDATA%\Claude-Data\<profile>` |
+| Claude Code config (login, settings, MCP, history) | `%LOCALAPPDATA%\Claude-Code-Data\<profile>` |
+| Profile list | `profiles.json` next to the script or `.exe` |
 
 `profiles.json` contains your account emails and local paths, so it is excluded from git via `.gitignore`.
 
@@ -126,8 +205,14 @@ No. Your main profile is untouched; open it from the menu with `M`.
 **Will removing a profile delete my Claude conversations?**
 No. It only deletes the local data folder on this PC. Conversations are stored on your Claude account.
 
+**Can I use multiple Claude Code accounts at the same time?**
+Yes. Each Claude Code profile runs in its own terminal with its own `CLAUDE_CONFIG_DIR`, so two accounts can work in parallel.
+
+**Does the Claude Code profile change my normal `~/.claude` setup?**
+No. Running `claude` in a normal terminal still uses `%USERPROFILE%\.claude`.
+
 **Does it work on macOS or Linux?**
-This script is Windows-only. The same `--user-data-dir` approach works on other platforms with a small shell script.
+This script is Windows-only. The same `--user-data-dir` and `CLAUDE_CONFIG_DIR` approach works on other platforms with a small shell script.
 
 **Is each profile's MCP / `claude_desktop_config.json` separate?**
 Yes — every profile has its own data directory, so configuration is per profile.
@@ -135,6 +220,8 @@ Yes — every profile has its own data directory, so configuration is per profil
 ## Troubleshooting
 
 - **"Claude Desktop was not found"** — install Claude Desktop, or add your `Claude.exe` path to `$ClaudeCandidates`.
+- **"Claude Code was not found"** — install Claude Code, or add your `claude.exe` path to `$ClaudeCodeCandidates`.
+- **Claude Code asks me to log in again** — expected the first time for each profile; run `/login` once per profile.
 - **Script blocked by execution policy** — always launch through `start.bat`, which runs PowerShell with `-ExecutionPolicy Bypass` for this script only.
 - **A new window opens in the wrong account** — close all Claude windows and launch the profile again from the menu.
 

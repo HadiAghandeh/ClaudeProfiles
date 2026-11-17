@@ -7,3 +7,7 @@ Desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# Go build output
+dist/
+*.exe
