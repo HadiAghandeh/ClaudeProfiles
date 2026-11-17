@@ -5,6 +5,10 @@
 [![Release](https://img.shields.io/github/v/release/HadiAghandeh/ClaudeMultiUser)](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest)
 [![CI](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml/badge.svg)](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml)
 
+<p align="center">
+  <img src="docs/screenshot.png" width="760" alt="Claude Profiles window on Windows listing four Claude accounts, each with buttons to open Claude Desktop or Claude Code as that account">
+</p>
+
 > Keywords: Claude Desktop multiple accounts, Claude Code multiple accounts, Claude Code switch account, `CLAUDE_CONFIG_DIR`, Claude multi-user, Claude profile manager, switch Claude accounts, run two Claude Desktop instances, Anthropic Claude Windows, `--user-data-dir`, PowerShell launcher, Go CLI.
 
 ---

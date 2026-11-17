@@ -50,13 +50,14 @@ func runGUI(recordsFile string) error {
 	if err != nil {
 		return err
 	}
+	scale := enableDPIAwareness()
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		AutoFocus: true,
 		DataPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Claude-Profiles", "WebView2"),
 		WindowOptions: webview2.WindowOptions{
 			Title:  "Claude Profiles",
-			Width:  780,
-			Height: 600,
+			Width:  uint(780 * scale),
+			Height: uint(600 * scale),
 			Center: true,
 		},
 	})
@@ -64,7 +65,7 @@ func runGUI(recordsFile string) error {
 		return errors.New("this window needs the Microsoft Edge WebView2 Runtime.\n\nInstall it from https://developer.microsoft.com/microsoft-edge/webview2/ or use claude-profiles.exe in a terminal instead")
 	}
 	defer w.Destroy()
-	w.SetSize(560, 420, webview2.HintMin)
+	w.SetSize(int(560*scale), int(420*scale), webview2.HintMin)
 
 	g := &gui{a: a, w: w, lastDir: os.Getenv("USERPROFILE")}
 	// Bound functions run on the UI thread and resolve a JavaScript promise.
@@ -172,7 +173,32 @@ func (g *gui) browseFolder(start string) {
 	}()
 }
 
-var procMessageBox = syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW")
+var (
+	user32                            = syscall.NewLazyDLL("user32.dll")
+	procMessageBox                    = user32.NewProc("MessageBoxW")
+	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
+	procSetProcessDPIAware            = user32.NewProc("SetProcessDPIAware")
+	procGetDpiForSystem               = user32.NewProc("GetDpiForSystem")
+)
+
+// enableDPIAwareness makes Windows render the window at the display's real
+// resolution instead of stretching a 96-DPI bitmap (blurry text on scaled
+// displays). It returns the display scale (1.0 at 100%, 2.0 at 200%), since
+// window sizes are then in physical pixels.
+func enableDPIAwareness() float64 {
+	const perMonitorAwareV2 = ^uintptr(3) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 (-4)
+	if procSetProcessDpiAwarenessContext.Find() == nil {
+		procSetProcessDpiAwarenessContext.Call(perMonitorAwareV2) // Windows 10 1703+
+	} else if procSetProcessDPIAware.Find() == nil {
+		procSetProcessDPIAware.Call()
+	}
+	if procGetDpiForSystem.Find() == nil {
+		if dpi, _, _ := procGetDpiForSystem.Call(); dpi >= 96 {
+			return float64(dpi) / 96
+		}
+	}
+	return 1
+}
 
 func showError(msg string) {
 	text, _ := syscall.UTF16PtrFromString(msg)
