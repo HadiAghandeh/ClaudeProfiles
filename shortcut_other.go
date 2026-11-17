@@ -1,16 +1,11 @@
-//go:build !windows
+//go:build !windows && !linux && !darwin
 
 package main
 
 import "errors"
 
-const (
-	placeDesktop = "desktop"
-	placeStart   = "start"
-)
-
 func (a *app) createShortcut(r *Record, place string, code bool, dir string) (string, error) {
-	return "", errors.New("shortcuts are only supported on Windows")
+	return "", errors.New("shortcuts are not supported on this operating system")
 }
 
 func removeShortcuts(label string) {}

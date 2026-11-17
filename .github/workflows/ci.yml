@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,16 +20,60 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
 
       - name: Vet
-        run: go vet ./...
-
-      - name: Vet (GUI build)
-        run: go vet -tags gui ./...
+        run: |
+          go vet ./...
+          go vet -tags gui ./...
 
       - name: Test
         run: go test ./...
 
       - name: Build
-        run: go build -o claude-profiles.exe .
+        run: |
+          go build -o claude-profiles.exe .
+          go build -tags gui -ldflags "-H=windowsgui" -o claude-profiles-gui.exe .
 
-      - name: Build GUI
-        run: go build -tags gui -ldflags "-H=windowsgui" -o claude-profiles-gui.exe .
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      # webview_go asks for webkit2gtk-4.0; this alias points it at 4.1.
+      PKG_CONFIG_PATH: ${{ github.workspace }}/build/linux/pkgconfig
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install GTK and WebKitGTK headers
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Vet
+        run: |
+          go vet ./...
+          CGO_ENABLED=1 go vet -tags gui ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: |
+          CGO_ENABLED=0 go build -o claude-profiles .
+          CGO_ENABLED=1 go build -tags gui -o claude-profiles-gui .
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: CGO_ENABLED=0 go build -o claude-profiles .

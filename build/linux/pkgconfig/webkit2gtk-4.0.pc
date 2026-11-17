@@ -1,0 +1,8 @@
+# webview_go asks pkg-config for webkit2gtk-4.0, which current distributions
+# (Ubuntu 24.04, Debian 13, Fedora 40+) no longer ship. This alias points it at
+# webkit2gtk-4.1, which has the same API. Build the Linux window with:
+#   PKG_CONFIG_PATH=$PWD/build/linux/pkgconfig CGO_ENABLED=1 go build -tags gui ...
+Name: webkit2gtk-4.0
+Description: Alias of webkit2gtk-4.1 for webview_go
+Version: 2.40.0
+Requires: webkit2gtk-4.1

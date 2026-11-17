@@ -1,6 +1,7 @@
-# GoReleaser config: builds claude-profiles.exe (terminal) and
-# claude-profiles-gui.exe (window) for Windows and publishes a
-# GitHub release when a tag like v1.2.3 is pushed. See .github/workflows/release.yml.
+# GoReleaser config, run by .github/workflows/release.yml when a tag like
+# v1.2.3 is pushed. It publishes:
+#   - claude-profiles      terminal app for Windows, macOS and Linux (amd64, arm64)
+#   - claude-profiles-gui  window app for Windows (amd64, arm64) and Linux (amd64)
 version: 2
 
 project_name: claude-profiles
@@ -9,46 +10,59 @@ before:
   hooks:
     - go mod tidy
     - go test ./...
-    # Embed the icon and stamp this release's version into the .exe files.
+    # Embed the icon and stamp this release's version into the Windows .exe files.
     - go run github.com/tc-hib/go-winres@v0.3.3 make --in winres/winres.json --arch amd64,arm64 --product-version={{ .Major }}.{{ .Minor }}.{{ .Patch }} --file-version={{ .Major }}.{{ .Minor }}.{{ .Patch }}
 
 builds:
+  # Terminal app: pure Go, cross-compiled for every platform.
   - id: claude-profiles
     main: .
     binary: claude-profiles
     env:
       - CGO_ENABLED=0
-    goos:
-      - windows
-    goarch:
-      - amd64
-      - arm64
+    goos: [windows, darwin, linux]
+    goarch: [amd64, arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{ .Version }}
 
-  # Windowed version: same code built with the gui tag, no console window.
-  - id: claude-profiles-gui
+  # Windows window app (WebView2, no CGO), with no console window.
+  - id: claude-profiles-gui-windows
     main: .
     binary: claude-profiles-gui
-    tags:
-      - gui
+    tags: [gui]
     env:
       - CGO_ENABLED=0
-    goos:
-      - windows
-    goarch:
-      - amd64
-      - arm64
+    goos: [windows]
+    goarch: [amd64, arm64]
     flags:
       - -trimpath
     ldflags:
       - -s -w -H=windowsgui -X main.version={{ .Version }}
 
+  # Linux window app (WebKitGTK through CGO). Built natively on the release
+  # runner, which has the GTK/WebKit headers; PKG_CONFIG_PATH (set by the
+  # workflow) maps webkit2gtk-4.0 to 4.1.
+  - id: claude-profiles-gui-linux
+    main: .
+    binary: claude-profiles-gui
+    tags: [gui]
+    env:
+      - CGO_ENABLED=1
+    goos: [linux]
+    goarch: [amd64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
 archives:
   - id: default
-    formats: [zip]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - README.md

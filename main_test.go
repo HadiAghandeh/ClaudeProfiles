@@ -151,14 +151,18 @@ func TestRecentDirs(t *testing.T) {
 	if len(r.RecentDirs) != maxRecentDirs || r.RecentDirs[0] != dirs[6] || r.RecentDirs[4] != dirs[2] {
 		t.Fatalf("newest first, capped: %v", r.RecentDirs)
 	}
-	// Re-using a folder (with different case and a trailing slash) moves it
-	// to the front instead of adding a duplicate.
-	r.addRecentDir(strings.ToUpper(dirs[4]) + string(filepath.Separator))
-	if len(r.RecentDirs) != maxRecentDirs || !strings.EqualFold(r.RecentDirs[0], dirs[4]) {
+	// Re-using a folder (with a trailing slash, and different case where paths
+	// ignore case) moves it to the front instead of adding a duplicate.
+	again := dirs[4] + string(filepath.Separator)
+	if pathKey("A") == pathKey("a") {
+		again = strings.ToUpper(dirs[4]) + string(filepath.Separator)
+	}
+	r.addRecentDir(again)
+	if len(r.RecentDirs) != maxRecentDirs || pathKey(r.RecentDirs[0]) != pathKey(dirs[4]) {
 		t.Fatalf("moved to front: %v", r.RecentDirs)
 	}
 	for _, d := range r.RecentDirs[1:] {
-		if strings.EqualFold(d, dirs[4]) {
+		if pathKey(d) == pathKey(dirs[4]) {
 			t.Fatalf("duplicate kept: %v", r.RecentDirs)
 		}
 	}

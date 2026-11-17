@@ -14,12 +14,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Where shortcuts can be placed.
-const (
-	placeDesktop = "desktop"
-	placeStart   = "start"
-)
-
 // startMenuFolder groups this app's shortcuts in the Start menu.
 const startMenuFolder = "Claude Profiles"
 

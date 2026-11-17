@@ -233,7 +233,7 @@
       <h2 id="scTitle">Create shortcut</h2>
       <fieldset class="choice">
         <legend class="small">Opens</legend>
-        <label><input type="radio" name="scApp" value="desktop" checked> Claude Desktop</label>
+        <label id="scDesktopApp"><input type="radio" name="scApp" value="desktop" checked> Claude Desktop</label>
         <label><input type="radio" name="scApp" value="code"> Claude Code</label>
       </fieldset>
       <div id="scDirRow" hidden>
@@ -247,7 +247,7 @@
       <fieldset class="choice">
         <legend class="small">Put it on</legend>
         <label><input type="checkbox" id="scDesktop" checked> Desktop</label>
-        <label><input type="checkbox" id="scStart" checked> Start menu</label>
+        <label><input type="checkbox" id="scStart" checked> <span id="scStartLabel">Start menu</span></label>
       </fieldset>
       <p class="warn" id="scErr" role="alert" hidden></p>
       <div class="buttons">
@@ -292,7 +292,16 @@
   }
   const errText = (e) => String(e && e.message ? e.message : e).replace(/^./, (c) => c.toUpperCase());
 
+  // Platform differences: Claude Desktop isn't available on Linux (unless an
+  // unofficial build is installed), and the app menu has a different name.
+  const hasDesktop = () => state.desktopAvailable !== false;
+  const startLabel = () => state.startLabel || "Start menu";
+  const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
   function render() {
+    $("mainBtn").hidden = !hasDesktop();
+    $("scStartLabel").textContent = capital(startLabel());
+    $("scDesktopApp").hidden = !hasDesktop();
     $("version").textContent = state.version && state.version !== "dev" ? "v" + state.version : "";
     $("file").textContent = "Profiles: " + (state.profilesFile || "");
     $("file").title = state.profilesFile || "";
@@ -317,7 +326,7 @@
       const nameRow = el("div", { className: "name-row" }, el("div", { className: "name", textContent: p.label }), edit);
       edit.onclick = () => startRename(p, nameRow);
       const code = el("button", { type: "button", textContent: "Claude Code", title: "Open Claude Code as " + p.label });
-      const sc = el("button", { className: "icon", type: "button", title: "Create a Desktop or Start menu shortcut for " + p.label, ariaLabel: "Create shortcut for " + p.label });
+      const sc = el("button", { className: "icon", type: "button", title: "Create a Desktop or " + startLabel() + " shortcut for " + p.label, ariaLabel: "Create shortcut for " + p.label });
       sc.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6.5 9.5l3-3M7 6.5h2.5V9"/></svg>';
       sc.onclick = () => openShortcut(p);
       const rm = el("button", { className: "icon rm", type: "button", title: "Remove " + p.label, ariaLabel: "Remove " + p.label });
@@ -328,7 +337,8 @@
       const row = el("li", { className: "row" + (p.label === freshLabel ? " fresh" : "") },
         avatar,
         el("div", { className: "who" }, nameRow, meta),
-        el("div", { className: "actions" }, desktop, code, sc, rm));
+        el("div", { className: "actions" }, ...(hasDesktop() ? [desktop] : []), code, sc, rm));
+      if (!hasDesktop()) code.className = "primary";
       list.append(row);
     }
     freshLabel = null;
@@ -491,6 +501,7 @@
   function openShortcut(p) {
     scFor = p;
     $("scTitle").textContent = "Create shortcut for " + p.label;
+    if (!hasDesktop()) document.querySelector('input[name=scApp][value=code]').checked = true;
     renderRecents($("scRecents"), $("scDir"), p, null);
     $("scErr").hidden = true;
     syncShortcutForm();
@@ -507,7 +518,7 @@
     }, null, $("scErr"));
     if (ok) {
       $("scDlg").close();
-      const where = made.length > 1 ? "on the Desktop and in the Start menu" : (made[0] || "").includes("\\Start Menu\\") ? "in the Start menu" : "on the Desktop";
+      const where = made.length > 1 ? "on the Desktop and in the " + startLabel() : made[0] === "start" ? "in the " + startLabel() : "on the Desktop";
       toast("Created " + (code ? "Claude Code" : "Claude Desktop") + " shortcut " + where);
     }
   };

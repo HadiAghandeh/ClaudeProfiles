@@ -1,21 +1,19 @@
-// Command claude-profiles is the Go version of the Claude Desktop and Claude Code
-// profile launcher. It shows every Claude profile (user) you have, lets you add a
-// new one by email, and starts the one you pick with its own login, settings and
-// data:
+// Command claude-profiles runs Claude Desktop and Claude Code with separate
+// accounts side by side on Windows, macOS and Linux. It shows every Claude
+// profile (user) you have, lets you add a new one by email, and starts the one
+// you pick with its own login, settings and data:
 //
-//   - Claude Desktop in its own window (--user-data-dir)
-//   - Claude Code in its own terminal (CLAUDE_CONFIG_DIR)
-//
-// It reads and writes the same profiles.json and data folders as
-// claude-profiles.ps1, so both versions can be used side by side.
+//   - Claude Desktop in its own window (--user-data-dir); Windows and macOS
+//   - Claude Code with its own config folder (CLAUDE_CONFIG_DIR); all three.
+//     On macOS and Linux it runs in the current terminal when started from one.
 //
 // Usage:
 //
 //	claude-profiles                                  open the menu
 //	claude-profiles -profile a@second.com            start that user's Claude Desktop
 //	claude-profiles -profile a@second.com -code      start that user's Claude Code in the current folder
-//	claude-profiles -profile a@second.com -code -dir C:\src\app
-//	claude-profiles -profile a@second.com -shortcut both    Desktop + Start menu shortcuts (add -code for Claude Code)
+//	claude-profiles -profile a@second.com -code -dir ~/src/app
+//	claude-profiles -profile a@second.com -shortcut both    Desktop + menu shortcuts (add -code for Claude Code)
 //	claude-profiles -profile a@second.com -rename b@second.com   rename (data and sign-in kept)
 //	claude-profiles -list                            list the profiles and exit
 package main
@@ -42,15 +40,14 @@ import (
 // version is set at build time by GoReleaser (-X main.version=...).
 var version = "dev"
 
-// Record is one profile, stored in profiles.json in the same shape the
-// PowerShell script uses.
+// Record is one profile, stored in profiles.json. (Files written by the old
+// PowerShell version of this tool use the same shape and still load.)
 type Record struct {
 	Label    string `json:"label"`
 	Folder   string `json:"folder"`
 	Created  string `json:"created"`
 	LastUsed string `json:"lastUsed"`
 	// RecentDirs are the latest Claude Code project folders, newest first.
-	// The PowerShell script keeps this field when it rewrites the file.
 	RecentDirs []string `json:"recentDirs,omitempty"`
 }
 
@@ -61,7 +58,15 @@ type app struct {
 	records      []*Record
 	in           *bufio.Reader
 	eof          bool // stdin is closed
+	codeHere     bool // run Claude Code in this terminal (macOS/Linux CLI)
 }
+
+// Where shortcuts can be placed: the Desktop, or the system's app launcher
+// (Windows Start menu, macOS Applications folder, Linux app menu).
+const (
+	placeDesktop = "desktop"
+	placeStart   = "start"
+)
 
 var (
 	mainStoreFolder = regexp.MustCompile(`^claude_[a-z0-9]+$`)
@@ -75,7 +80,7 @@ func main() {
 	code := flag.Bool("code", false, "with -profile: start Claude Code instead of Claude Desktop")
 	dir := flag.String("dir", "", "with -code: project folder to open (default: current folder)")
 	list := flag.Bool("list", false, "list the profiles and exit")
-	records := flag.String("profiles-file", "", "path to profiles.json (default: next to the executable)")
+	records := flag.String("profiles-file", "", "path to profiles.json (default: next to the .exe on Windows, ~/.config/claude-profiles on Linux, ~/Library/Application Support/Claude Profiles on macOS)")
 	shortcut := flag.String("shortcut", "", "with -profile: create a shortcut instead of starting it: desktop, start or both")
 	rename := flag.String("rename", "", "with -profile: give that user this new email or name (data and sign-in are kept)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -144,6 +149,7 @@ func run(o options) error {
 	if err != nil {
 		return err
 	}
+	a.codeHere = codeRunsInThisTerminal()
 
 	switch {
 	case o.list:
@@ -204,23 +210,21 @@ func (a *app) makeShortcuts(r *Record, where string, code bool, dir string) erro
 }
 
 func newApp(recordsFile string) (*app, error) {
-	local := os.Getenv("LOCALAPPDATA")
-	if local == "" {
-		return nil, errors.New("LOCALAPPDATA is not set; this tool runs on Windows")
+	desktopRoot, codeRoot, err := dataRoots()
+	if err != nil {
+		return nil, err
 	}
 	if recordsFile == "" {
-		exe, err := os.Executable()
-		if err != nil {
+		if recordsFile, err = defaultRecordsFile(); err != nil {
 			return nil, err
 		}
-		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = resolved
-		}
-		recordsFile = filepath.Join(filepath.Dir(exe), "profiles.json")
+	}
+	if err := os.MkdirAll(filepath.Dir(recordsFile), 0o755); err != nil {
+		return nil, err
 	}
 	return &app{
-		dataRoot:     filepath.Join(local, "Claude-Data"),
-		codeDataRoot: filepath.Join(local, "Claude-Code-Data"),
+		dataRoot:     desktopRoot,
+		codeDataRoot: codeRoot,
 		recordsFile:  recordsFile,
 		in:           bufio.NewReader(os.Stdin),
 	}, nil
@@ -281,14 +285,14 @@ func (a *app) discover() {
 	}
 	known := map[string]bool{}
 	for _, r := range a.records {
-		known[strings.ToLower(r.Folder)] = true
+		known[pathKey(r.Folder)] = true
 	}
 	for _, e := range entries {
 		if !e.IsDir() || mainStoreFolder.MatchString(e.Name()) {
 			continue
 		}
 		full := filepath.Join(a.dataRoot, e.Name())
-		if known[strings.ToLower(full)] {
+		if known[pathKey(full)] {
 			continue
 		}
 		created := ""
@@ -333,44 +337,15 @@ func (a *app) touch(r *Record) error {
 
 // ---------------------------------------------------------------- launching
 
-func findClaudeDesktop() (string, error) {
-	local := os.Getenv("LOCALAPPDATA")
-	for _, c := range []string{
-		filepath.Join(local, `Microsoft\WindowsApps\claude-desktop.exe`),
-		filepath.Join(local, `Programs\Claude\Claude.exe`),
-		filepath.Join(local, `AnthropicClaude\Claude.exe`),
-	} {
-		if exists(c) {
-			return c, nil
-		}
-	}
-	return "", errors.New("Claude Desktop was not found; install it from https://claude.ai/download")
-}
-
-func findClaudeCode() (string, error) {
-	if p, err := exec.LookPath("claude"); err == nil {
-		return p, nil
-	}
-	for _, c := range []string{
-		filepath.Join(os.Getenv("USERPROFILE"), `.local\bin\claude.exe`),
-		filepath.Join(os.Getenv("APPDATA"), `npm\claude.cmd`),
-	} {
-		if exists(c) {
-			return c, nil
-		}
-	}
-	return "", errors.New("Claude Code was not found; install it (see https://docs.claude.com/en/docs/claude-code/setup)")
-}
-
 func (a *app) launchDesktop(r *Record) error {
-	claude, err := findClaudeDesktop()
+	cmd, err := desktopCommand(r.Folder)
 	if err != nil {
 		return err
 	}
 	if err := os.MkdirAll(r.Folder, 0o755); err != nil {
 		return err
 	}
-	if err := startDetached(exec.Command(claude, "--user-data-dir="+r.Folder), false); err != nil {
+	if err := startDetached(cmd, false); err != nil {
 		return err
 	}
 	fmt.Printf("Started Claude Desktop as %s\n", r.Label)
@@ -378,17 +353,20 @@ func (a *app) launchDesktop(r *Record) error {
 }
 
 func (a *app) launchMain() error {
-	claude, err := findClaudeDesktop()
+	cmd, err := desktopCommand("")
 	if err != nil {
 		return err
 	}
-	if err := startDetached(exec.Command(claude), false); err != nil {
+	if err := startDetached(cmd, false); err != nil {
 		return err
 	}
 	fmt.Println("Started your main Claude Desktop")
 	return nil
 }
 
+// launchCode starts Claude Code as r in workDir (blank: the home folder). From
+// a terminal on macOS and Linux it runs right there; otherwise it opens a new
+// terminal window.
 func (a *app) launchCode(r *Record, workDir string) error {
 	claude, err := findClaudeCode()
 	if err != nil {
@@ -399,7 +377,9 @@ func (a *app) launchCode(r *Record, workDir string) error {
 		return err
 	}
 	if workDir == "" {
-		workDir = os.Getenv("USERPROFILE")
+		if workDir, err = os.UserHomeDir(); err != nil {
+			return err
+		}
 	}
 	if workDir, err = filepath.Abs(workDir); err != nil {
 		return err
@@ -408,21 +388,15 @@ func (a *app) launchCode(r *Record, workDir string) error {
 		return fmt.Errorf("folder not found: %s", workDir)
 	}
 
-	// Windows Terminal treats ';' as a command separator.
-	title := strings.ReplaceAll("Claude Code - "+r.Label, ";", ",")
-	script := fmt.Sprintf("$Host.UI.RawUI.WindowTitle = %s; $env:CLAUDE_CONFIG_DIR = %s; Set-Location -LiteralPath %s; & %s",
-		psQuote(title), psQuote(configDir), psQuote(workDir), psQuote(claude))
-	psArgs := []string{"-NoExit", "-NoProfile", "-EncodedCommand", encodePS(script)}
-
-	var cmd *exec.Cmd
-	newConsole := false
-	if wt, err := exec.LookPath("wt.exe"); err == nil {
-		cmd = exec.Command(wt, append([]string{"new-tab", "--title", title, "powershell.exe"}, psArgs...)...)
-	} else {
-		cmd = exec.Command("powershell.exe", psArgs...)
-		newConsole = true
+	if a.codeHere {
+		r.addRecentDir(workDir)
+		if err := a.touch(r); err != nil {
+			return err
+		}
+		fmt.Printf("Claude Code as %s in %s\n", r.Label, workDir)
+		return runCodeHere(claude, configDir, workDir) // only returns on failure
 	}
-	if err := startDetached(cmd, newConsole); err != nil {
+	if err := openCodeTerminal("Claude Code - "+r.Label, claude, configDir, workDir); err != nil {
 		return err
 	}
 	fmt.Printf("Started Claude Code as %s in %s\n", r.Label, workDir)
@@ -434,13 +408,13 @@ func (a *app) launchCode(r *Record, workDir string) error {
 const maxRecentDirs = 5
 
 // addRecentDir moves dir to the front of the profile's recent Claude Code
-// folders (ignoring case and trailing slashes, as Windows does), keeping at
-// most maxRecentDirs.
+// folders (ignoring trailing slashes, and letter case on Windows and macOS),
+// keeping at most maxRecentDirs.
 func (r *Record) addRecentDir(dir string) {
 	dir = filepath.Clean(dir)
 	list := []string{dir}
 	for _, d := range r.RecentDirs {
-		if !strings.EqualFold(filepath.Clean(d), dir) && len(list) < maxRecentDirs {
+		if pathKey(d) != pathKey(dir) && len(list) < maxRecentDirs {
 			list = append(list, d)
 		}
 	}
@@ -451,7 +425,7 @@ func (r *Record) addRecentDir(dir string) {
 func (r *Record) forgetRecentDir(dir string) {
 	var list []string
 	for _, d := range r.RecentDirs {
-		if !strings.EqualFold(filepath.Clean(d), filepath.Clean(dir)) {
+		if pathKey(d) != pathKey(dir) {
 			list = append(list, d)
 		}
 	}
@@ -572,14 +546,23 @@ func (a *app) showMenu() {
 		fmt.Printf("  %2d)  %-32s %s\n", i+1, r.Label, when)
 	}
 	fmt.Println()
-	fmt.Println("   1, 2, ...   Claude Desktop as that user (* = already open)")
-	fmt.Println("  C1, C2, ...  Claude Code as that user (opens a terminal)")
+	desktop := desktopAvailable()
+	if desktop {
+		fmt.Println("   1, 2, ...   Claude Desktop as that user (* = already open)")
+	}
+	where := "opens a terminal"
+	if a.codeHere {
+		where = "runs in this terminal"
+	}
+	fmt.Printf("  C1, C2, ...  Claude Code as that user (%s)\n", where)
 	fmt.Println()
-	fmt.Println("   M)  Main Claude Desktop (your normal profile)")
+	if desktop {
+		fmt.Println("   M)  Main Claude Desktop (your normal profile)")
+	}
 	fmt.Println("   A)  Add a new user")
 	fmt.Println("   N)  Rename a user")
 	fmt.Println("   R)  Remove a user")
-	fmt.Println("   S)  Create a Desktop / Start menu shortcut")
+	fmt.Printf("   S)  Create a Desktop / %s shortcut\n", placeLabel(placeStart))
 	fmt.Println("   Q)  Quit")
 	fmt.Println()
 }
@@ -775,7 +758,7 @@ func (a *app) removeProfile() error {
 	fmt.Printf("This removes %s and deletes its data folders:\n", r.Label)
 	fmt.Printf("  %s   (Claude Desktop)\n", r.Folder)
 	fmt.Printf("  %s   (Claude Code)\n", codeDir)
-	fmt.Println("Its Desktop and Start menu shortcuts are removed too.")
+	fmt.Printf("Its Desktop and %s shortcuts are removed too.\n", placeLabel(placeStart))
 	fmt.Println("That signs the user out on this PC and cannot be undone. Conversations stay on the Claude account.")
 	if a.prompt("Type DELETE to confirm, anything else to cancel: ") != "DELETE" {
 		fmt.Println("Cancelled.")
@@ -793,10 +776,4 @@ func (a *app) removeProfile() error {
 func exists(p string) bool {
 	_, err := os.Lstat(p) // Lstat: app execution aliases are reparse points
 	return err == nil
-}
-
-func clearScreen() {
-	cmd := exec.Command("cmd", "/c", "cls")
-	cmd.Stdout = os.Stdout
-	_ = cmd.Run()
 }
