@@ -82,5 +82,12 @@ changelog:
       - "^chore:"
 
 release:
+  # Named explicitly: the repository was renamed from ClaudeMultiUser, and
+  # asset uploads don't follow GitHub's redirect from the old name.
+  github:
+    owner: HadiAghandeh
+    name: ClaudeProfiles
   draft: false
   prerelease: auto
+  # A failed run can leave a release with some files; replace them on retry.
+  replace_existing_artifacts: true

@@ -1,4 +1,4 @@
-module github.com/HadiAghandeh/ClaudeMultiUser
+module github.com/HadiAghandeh/ClaudeProfiles
 
 go 1.22
 

@@ -4,8 +4,8 @@
 
 **Run multiple Claude Desktop and Claude Code accounts side by side on one computer.** Claude Profiles gives every Claude account its own isolated profile — separate login, settings, MCP servers and data — for both the Claude Desktop app and the Claude Code CLI, so you can switch between work and personal Claude accounts (or several team accounts) without ever signing out.
 
-[![Release](https://img.shields.io/github/v/release/HadiAghandeh/ClaudeMultiUser)](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest)
-[![CI](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml/badge.svg)](https://github.com/HadiAghandeh/ClaudeMultiUser/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/HadiAghandeh/ClaudeProfiles)](https://github.com/HadiAghandeh/ClaudeProfiles/releases/latest)
+[![CI](https://github.com/HadiAghandeh/ClaudeProfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/HadiAghandeh/ClaudeProfiles/actions/workflows/ci.yml)
 
 <p align="center">
   <img src="docs/screenshot.png" width="760" alt="Claude Profiles window on Windows in dark mode, listing four Claude accounts with buttons to open Claude Desktop or Claude Code as each one; work@company.com is marked Open">
@@ -52,7 +52,7 @@ Claude Desktop and Claude Code sign in to one account at a time. If you have a p
 
 ¹ Claude Desktop for Linux is in [beta](https://code.claude.com/docs/en/desktop-linux) for Ubuntu 22.04+ and Debian 12+ (x64 and arm64, `sudo apt install claude-desktop`). Claude Profiles finds its `claude-desktop` command automatically and shows the Claude Desktop buttons; without it, the Linux app manages Claude Code profiles only. Tested with beta 5.11492: each profile runs as its own instance with its own data folder, and the **Open** status works. Like the beta itself, it needs a regular (non-root) user.
 
-> macOS support is new: it's built and checked by CI on every change, but hasn't been tried on a real Mac yet. Reports are welcome in [Issues](https://github.com/HadiAghandeh/ClaudeMultiUser/issues).
+> macOS support is new: it's built and checked by CI on every change, but hasn't been tried on a real Mac yet. Reports are welcome in [Issues](https://github.com/HadiAghandeh/ClaudeProfiles/issues).
 
 <p align="center">
   <img src="docs/screenshot-linux.png" width="640" alt="Claude Profiles window on Linux (GTK) listing Claude accounts with Claude Code buttons, shortcut and remove icons; work@company.com is marked Open">
@@ -71,11 +71,11 @@ Claude Desktop and Claude Code sign in to one account at a time. If you have a p
 - 🔒 **Fully isolated profiles** — separate login session, cookies, settings, MCP servers and cache.
 - 🔍 **Auto-discovery** — existing profile folders on disk are picked up automatically.
 - 🪶 **No dependencies** — a single executable per platform (the Linux window app needs WebKitGTK).
-- 📦 **Prebuilt releases** — for every platform on [GitHub Releases](https://github.com/HadiAghandeh/ClaudeMultiUser/releases).
+- 📦 **Prebuilt releases** — for every platform on [GitHub Releases](https://github.com/HadiAghandeh/ClaudeProfiles/releases).
 
 ## Installation
 
-Download the archive for your system from the [latest release](https://github.com/HadiAghandeh/ClaudeMultiUser/releases/latest). You also need [Claude Desktop](https://claude.ai/download) and/or [Claude Code](https://docs.claude.com/en/docs/claude-code/setup).
+Download the archive for your system from the [latest release](https://github.com/HadiAghandeh/ClaudeProfiles/releases/latest). You also need [Claude Desktop](https://claude.ai/download) and/or [Claude Code](https://docs.claude.com/en/docs/claude-code/setup).
 
 ### Windows
 
