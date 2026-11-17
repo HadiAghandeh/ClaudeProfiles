@@ -22,6 +22,9 @@ const guiBuild = true
 //go:embed ui/index.html
 var indexHTML string
 
+//go:embed winres/icon.ico
+var iconICO []byte
+
 const createNoWindow = 0x08000000
 
 type guiProfile struct {
@@ -66,6 +69,7 @@ func runGUI(recordsFile string) error {
 	}
 	defer w.Destroy()
 	w.SetSize(int(560*scale), int(420*scale), webview2.HintMin)
+	setWindowIcon(uintptr(w.Window()))
 
 	g := &gui{a: a, w: w, lastDir: os.Getenv("USERPROFILE")}
 	// Bound functions run on the UI thread and resolve a JavaScript promise.
@@ -179,7 +183,65 @@ var (
 	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
 	procSetProcessDPIAware            = user32.NewProc("SetProcessDPIAware")
 	procGetDpiForSystem               = user32.NewProc("GetDpiForSystem")
+	procGetSystemMetrics              = user32.NewProc("GetSystemMetrics")
+	procCreateIconFromResourceEx      = user32.NewProc("CreateIconFromResourceEx")
+	procSendMessage                   = user32.NewProc("SendMessageW")
 )
+
+// setWindowIcon sets the title bar and taskbar icon from the embedded .ico,
+// picking the entry closest to each size Windows asks for.
+func setWindowIcon(hwnd uintptr) {
+	const (
+		wmSetIcon  = 0x0080
+		iconSmall  = 0
+		iconBig    = 1
+		smCxIcon   = 11
+		smCxSmIcon = 49
+	)
+	for _, which := range []struct{ kind, metric uintptr }{{iconBig, smCxIcon}, {iconSmall, smCxSmIcon}} {
+		want, _, _ := procGetSystemMetrics.Call(which.metric)
+		bits := icoEntry(iconICO, int(want))
+		if bits == nil {
+			continue
+		}
+		h, _, _ := procCreateIconFromResourceEx.Call(uintptr(unsafe.Pointer(&bits[0])), uintptr(len(bits)), 1, 0x00030000, want, want, 0)
+		if h != 0 {
+			procSendMessage.Call(hwnd, wmSetIcon, which.kind, h)
+		}
+	}
+}
+
+// icoEntry returns the image data of the smallest icon at least `want` pixels
+// wide (or the largest one), from a .ico file.
+func icoEntry(ico []byte, want int) []byte {
+	if len(ico) < 6 {
+		return nil
+	}
+	count := int(ico[4]) | int(ico[5])<<8
+	best, bestSize := -1, 0
+	for i := 0; i < count && 6+16*(i+1) <= len(ico); i++ {
+		size := int(ico[6+16*i])
+		if size == 0 {
+			size = 256
+		}
+		better := best < 0 ||
+			(size >= want && (bestSize < want || size < bestSize)) ||
+			(bestSize < want && size > bestSize)
+		if better {
+			best, bestSize = i, size
+		}
+	}
+	if best < 0 {
+		return nil
+	}
+	e := ico[6+16*best:]
+	n := int(e[8]) | int(e[9])<<8 | int(e[10])<<16 | int(e[11])<<24
+	off := int(e[12]) | int(e[13])<<8 | int(e[14])<<16 | int(e[15])<<24
+	if off < 0 || n <= 0 || off+n > len(ico) {
+		return nil
+	}
+	return ico[off : off+n]
+}
 
 // enableDPIAwareness makes Windows render the window at the display's real
 // resolution instead of stretching a 96-DPI bitmap (blurry text on scaled

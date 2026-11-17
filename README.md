@@ -1,3 +1,5 @@
+<img src="docs/icon.png" width="96" align="right" alt="Claude Profiles app icon: two overlapping profile silhouettes">
+
 # Claude Desktop & Claude Code Multiple Accounts on Windows — Profile Switcher
 
 **Run multiple Claude Desktop and Claude Code accounts side by side on one Windows PC.** This lightweight launcher — available as a single-file Go `.exe` or a PowerShell script — gives every Claude user its own isolated profile — separate login, settings, MCP config and data — for both the Claude Desktop app and the Claude Code CLI, so you can switch between work and personal Claude accounts (or several team accounts) without signing out.
@@ -103,6 +105,18 @@ go build -tags gui -ldflags "-H=windowsgui" -o claude-profiles-gui.exe .
 ```
 
 The window is plain HTML in [`ui/index.html`](ui/index.html), embedded into the `.exe` and shown with [WebView2](https://github.com/jchv/go-webview2) (no CGO, so it cross-compiles).
+
+**App icon:** drawn by [`tools/icongen`](tools/icongen/main.go) into [`winres/icon.ico`](winres/icon.ico), and embedded (with version details) through the `rsrc_windows_*.syso` files, which Go links in automatically. After changing the icon or [`winres/winres.json`](winres/winres.json), regenerate them:
+
+```bash
+go run ./tools/icongen
+```
+
+```bash
+go run github.com/tc-hib/go-winres@v0.3.3 make --in winres/winres.json --arch amd64,arm64 --product-version 0.0.0 --file-version 0.0.0
+```
+
+The committed files say version `0.0.0` (a development build); releases rerun the second step with the release's version number.
 
 **Publishing a release:** releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions. Push a version tag and the workflow attaches the zips and checksums to a new GitHub release:
 
